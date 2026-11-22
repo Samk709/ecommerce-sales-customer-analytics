@@ -59,15 +59,33 @@ st.sidebar.markdown(
 )
 
 st.sidebar.markdown("### 🧭 Navigation")
+
+# Support URL query parameter for page navigation
+page_mapping = {
+    "overview": "🏠 Executive Overview",
+    "products": "📦 Products & Categories",
+    "customers": "👥 Customers & Retention",
+    "delivery": "🚚 Logistics SLA & CSAT",
+    "forecast": "📈 Sales Forecast"
+}
+nav_options = [
+    "🏠 Executive Overview",
+    "📦 Products & Categories",
+    "👥 Customers & Retention",
+    "🚚 Logistics SLA & CSAT",
+    "📈 Sales Forecast"
+]
+query_page = str(st.query_params.get("page", "")).lower()
+default_nav_idx = 0
+for idx, (k, v) in enumerate(page_mapping.items()):
+    if query_page == k:
+        default_nav_idx = idx
+        break
+
 nav_selection = st.sidebar.radio(
     "Select Report Page:",
-    [
-        "🏠 Executive Overview",
-        "📦 Products & Categories",
-        "👥 Customers & Retention",
-        "🚚 Logistics SLA & CSAT",
-        "📈 Sales Forecast"
-    ],
+    nav_options,
+    index=default_nav_idx,
     label_visibility="collapsed"
 )
 
@@ -100,10 +118,13 @@ selected_categories = st.sidebar.multiselect(
 
 # Filter: Customer States
 all_states = sorted(customers_df["customer_state"].dropna().unique())
+query_state = str(st.query_params.get("state", "")).upper()
+default_states = [query_state] if query_state in all_states else all_states
+
 selected_states = st.sidebar.multiselect(
     "Customer State (Federation)",
     options=all_states,
-    default=all_states
+    default=default_states
 )
 
 # Filter: RFM Segments
@@ -116,6 +137,7 @@ selected_rfm = st.sidebar.multiselect(
 
 # Filter Reset Button
 if st.sidebar.button("🔄 Reset All Filters", use_container_width=True):
+    st.query_params.clear()
     st.rerun()
 
 st.sidebar.markdown("---")
