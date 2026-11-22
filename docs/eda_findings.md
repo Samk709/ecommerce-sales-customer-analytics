@@ -1,4 +1,5 @@
 # Phase 4: Exploratory Data Analysis (EDA) & Customer Intelligence
+
 > **Currency Standard**: All monetary figures are reported strictly in **Brazilian Reais (R$ / BRL)**.
 > **Operational Filter**: All calculations filter strictly for delivered transactions (`order_status = 'delivered'`) and exclude shipping freight, unless explicitly stated.
 > **Profitability Notice**: All profit and COGS figures are labelled **"assumed margin, not real data"** based on category benchmark assumptions.
@@ -9,45 +10,47 @@
 |:---|---:|:---|
 | **Total Unique Customers** | **93,358** | Platform customer base across delivered orders |
 | **Total Merchandise Revenue** | **R$ 13,221,498.11** | Platform delivered item GMV (excludes freight) |
+| **Total Repeat Customers** | **2,801 (3.00%)** | Customers purchasing 2 or more delivered orders |
 | **Overall Historical CLV** | **R$ 141.62** | Average lifetime spend per unique customer |
 | **Margin-Adjusted Historical CLV** | **R$ 57.72** | Average gross profit contribution per customer *(Assumed)* |
 | **Repeat Buyer CLV Premium** | **R$ 260.05 vs R$ 137.96** | Repeat customers spend **+88.5%** more than one-time buyers |
 | **Month 1 Cohort Retention** | **0.47%** | Platform-wide average repeat retention in month 1 |
 | **Product Pareto Concentration** | **25.93% (8,352 SKUs)** | Proportion of products generating 80% of revenue |
-| **Delay Rating Degradation Rate** | **-0.0160 stars/day** | CSAT score decline for every additional day an order is late |
+| **On-Time vs Late CSAT Score** | **4.29 vs 2.27 stars** | Discontinuous CSAT rating drop of **2.02 stars** on date breach |
+| **Late-Only CSAT Degradation Rate** | **-0.0160 stars/day** | CSAT score decline per additional day of delay on late orders (`delay_days > 0`) |
 | **Overall Blended Gross Margin** | **40.76%** | Platform-wide gross margin across 11 macro categories *(Assumed)* |
-| **Forecast Validation WAPE** | **12.90%** | Weighted Absolute Percentage Error on 30-day holdout test |
+| **Forecast Holdout WAPE** | **12.90%** | Weighted Absolute Percentage Error on holdout window (2018-07-22 to 2018-08-20) |
 
 ---
 
 ## 1. RFM Customer Segmentation
 
 ### Methodology & One-Time Buyer Handling
-In the Olist dataset, **97.00% of customers purchase exactly once** (`frequency = 1`). Standard quintile or quantile binning on Frequency fails mathematically because all quantile cutoffs from the 20th to 80th percentiles collapse to 1. To resolve this robustly, we apply a **hybrid discrete-quantile scoring model**:
+In the Olist dataset, **97.00% of customers purchase exactly once** (`frequency = 1`). Specifically, only **2,801 out of 93,358 customers (3.00%)** are repeat buyers. Standard quintile or quantile binning on Frequency fails mathematically because all frequency quantile cutoffs from the 20th to 80th percentiles collapse to 1. To resolve this robustly, we apply a **hybrid discrete-quantile scoring model**:
 - **Recency ($R$)**: Segmented into quartiles (1 to 4, where 4 is most recent).
 - **Monetary ($M$)**: Segmented into quartiles (1 to 4, where 4 is highest total spend).
 - **Frequency ($F$)**: Categorized discretely as Repeat Buyer ($F \ge 2 \rightarrow F\_score = 2$) vs Single Buyer ($F = 1 \rightarrow F\_score = 1$).
 
-Customers are partitioned into four mutually exclusive segments:
-1. **Champions**: Repeat buyers who bought recently ($F=2, R \ge 3$) OR top-quartile spenders who bought recently ($R=4, M=4$).
-2. **Loyal**: All remaining repeat buyers ($F=2, R \le 2$) OR recent moderate-to-high spenders ($R \ge 3, M \ge 3$).
-3. **At Risk**: Previously moderate/high spenders who have not purchased in over 200 days ($R \le 2, M \ge 3$ or $R=2$).
-4. **Lost**: Dormant, low-spending one-time purchasers ($R=1, M \le 2$).
+To avoid overstating loyalty given the low repeat rate, segments are named transparently based on recency and monetary value:
+1. **Top Value**: Repeat buyers with recent activity ($F=2, R \ge 3$) OR top-quartile spenders who bought recently ($R=4, M=4$). High spenders with 22.36% repeat share.
+2. **Mid Value**: Remaining repeat buyers ($F=2, R \le 2$) OR recent moderate-to-high spenders ($R \ge 3, M \ge 3$). Contains 6.87% repeat buyers.
+3. **Lapsing**: Previously moderate/high spenders who have not purchased recently ($R=2$ or $R=1, M \ge 3$). 0.00% repeat buyers.
+4. **Inactive**: Oldest, low-spending one-time purchasers ($R=1, M \le 2$). 0.00% repeat buyers.
 
 ### Empirical RFM Segment Distribution
 
-| segment   |   customer_count |   total_revenue_brl |   avg_recency_days |   avg_frequency |   avg_spend_brl |   customer_pct |   revenue_pct |
-|:----------|-----------------:|--------------------:|-------------------:|----------------:|----------------:|---------------:|--------------:|
-| At Risk   |            33487 |        5,686,297.74 |             334.80 |            1.00 |          169.81 |          35.87 |         43.01 |
-| Loyal     |            18232 |        3,548,822.05 |             144.72 |            1.07 |          194.65 |          19.53 |         26.84 |
-| Champions |             6929 |        2,358,970.15 |              70.77 |            1.26 |          340.45 |           7.42 |         17.84 |
-| Lost      |            34710 |        1,627,408.17 |             226.83 |            1.00 |           46.89 |          37.18 |         12.31 |
+| segment   |   customer_count |   customer_pct |   repeat_customers |   repeat_buyer_pct |   total_revenue_brl |   revenue_pct |   avg_recency_days |   avg_frequency |   avg_spend_brl |
+|:----------|-----------------:|---------------:|-------------------:|-------------------:|--------------------:|--------------:|-------------------:|----------------:|----------------:|
+| Top Value |             6929 |           7.42 |               1549 |              22.36 |        2,358,970.15 |         17.84 |              70.77 |            1.26 |          340.45 |
+| Mid Value |            18232 |          19.53 |               1252 |               6.87 |        3,548,822.05 |         26.84 |             144.72 |            1.07 |          194.65 |
+| Lapsing   |            33487 |          35.87 |                  0 |               0.00 |        5,686,297.74 |         43.01 |             334.80 |            1.00 |          169.81 |
+| Inactive  |            34710 |          37.18 |                  0 |               0.00 |        1,627,408.17 |         12.31 |             226.83 |            1.00 |           46.89 |
 
 ![RFM Segment Distribution](screenshots/rfm_segments_distribution.png)
 
-> **Business Insight**: Champions represent only **7.42%** of customers (6,929 users) but deliver **R$ 2,358,970.15** (17.84% of sales) with an average order value of **R$ 340.45**. Conversely, the 'At Risk' cohort holds **R$ 5,686,297.74** (43.01% of sales), indicating severe lapsed revenue.
+> **Business Insight**: **Top Value** customers represent **7.42%** of the customer base (6,929 users) but generate **R$ 2,358,970.15** (17.84% of sales) with an average order value of **R$ 340.45** and the highest repeat buyer share (**22.36%**). Combined, 'Top Value' and 'Mid Value' capture **44.68%** of platform revenue.
 
-> **Actionable Recommendation**: Deploy automated win-back email sequences for the **33,487 At Risk customers** at the 180-day mark with personalized category discounts, preventing them from decaying into the **34,710 Lost segment**.
+> **Actionable Recommendation**: Deploy automated retention triggers for the **33,487 Lapsing customers** before they decay into the **34,710 Inactive segment**.
 
 ---
 
@@ -58,11 +61,11 @@ Tracking monthly acquisition cohorts from January 2017 to December 2017 reveals 
 
 - **Month 1 Retention Average**: **0.47%** across cohorts.
 - **Month 1 Retention Peak**: **0.72%**.
-- **Month 6 Retention Average**: Sub-0.40% across all tracking windows.
+- **Zero Return Months**: In the retention matrix and heatmap, observed calendar months where zero customers returned are displayed explicitly as **0.00**, while unobserved future months remain blank.
 
 ![Cohort Retention Heatmap](screenshots/cohort_retention_heatmap.png)
 
-> **Business Insight**: Retention is effectively near zero after the initial purchase month (0.47% in Month 1). Olist operates as an acquisition-dependent transaction marketplace rather than a sticky repeat ecosystem.
+> **Business Insight**: Retention is near zero after the initial purchase month (0.47% in Month 1). Olist operates as an acquisition-dependent transaction marketplace rather than a sticky repeat ecosystem.
 
 > **Actionable Recommendation**: Introduce post-purchase cross-category replenishment triggers (e.g., consumable accessories for Electronics, beauty refills) delivered 30-45 days post-purchase to drive first-to-second order conversion.
 
@@ -78,14 +81,14 @@ Tracking monthly acquisition cohorts from January 2017 to December 2017 reveals 
 
 | segment   |   customer_count |   historical_clv_brl |   margin_adjusted_clv_brl |
 |:----------|-----------------:|---------------------:|--------------------------:|
-| At Risk   |            33487 |               169.81 |                     69.21 |
-| Loyal     |            18232 |               194.65 |                     79.34 |
-| Champions |             6929 |               340.45 |                    138.77 |
-| Lost      |            34710 |                46.89 |                     19.11 |
+| Top Value |             6929 |               340.45 |                    138.77 |
+| Mid Value |            18232 |               194.65 |                     79.34 |
+| Lapsing   |            33487 |               169.81 |                     69.21 |
+| Inactive  |            34710 |                46.89 |                     19.11 |
 
 > **Business Insight**: Repeat buyers yield an average lifetime value of **R$ 260.05**, representing an incremental **R$ 122.09** (+88.5%) over single-order buyers.
 
-> **Actionable Recommendation**: Customer Acquisition Cost (CAC) must not exceed **R$ 57.72** for blended traffic to remain profitable on first orders. For retargeting repeat campaigns, the allowable CAC ceiling can expand to **R$ 106.00**.
+> **Actionable Recommendation**: Customer Acquisition Cost (CAC) must not exceed **R$ 57.72** for blended traffic to remain profitable on first orders. For retargeting repeat campaigns, the allowable CAC ceiling expands to **R$ 106.00**.
 
 ---
 
@@ -106,7 +109,17 @@ Tracking monthly acquisition cohorts from January 2017 to December 2017 reveals 
 
 ## 5. Delivery Logistics SLA vs Customer Satisfaction (CSAT)
 
-### Satisfaction by Delivery Performance Tier
+### Definition of Late Orders
+To maintain mathematical consistency with Query 13 and Query 8, delivery delay is defined using calendar dates: `DATE(order_delivered_customer_date) > DATE(order_estimated_delivery_date)`. Same-day deliveries where arrival occurs on the estimated date are treated as on-time.
+
+### (a) On-Time vs Late Performance Comparison
+
+| fulfillment_status                                 |   review_count |   avg_review_score |   detractor_pct_1_2 |   promoter_pct_5 |
+|:---------------------------------------------------|---------------:|-------------------:|--------------------:|-----------------:|
+| On-Time / Early (Delivered Date <= Estimated Date) |          89944 |               4.29 |                9.28 |            62.26 |
+| Late (Delivered Date > Estimated Date)             |           6409 |               2.27 |               62.41 |            16.54 |
+
+### Detailed Fulfillment Delay Tiers
 
 | delay_bucket                   |   review_count |   avg_review_score |   detractor_pct_1_2 |   promoter_pct_5 |
 |:-------------------------------|---------------:|-------------------:|--------------------:|-----------------:|
@@ -118,13 +131,15 @@ Tracking monthly acquisition cohorts from January 2017 to December 2017 reveals 
 
 ![Delivery Delay vs CSAT](screenshots/delivery_delay_vs_review_score.png)
 
-### Regression Analysis on Delayed Deliveries (`delay_days > 0`)
+### (b) OLS Regression Analysis on Late Orders Only (`delay_days > 0`)
 
-- **Slope ($\\beta_1$)**: **-0.0160 stars per day of delay** ($p = 3.48e-32$).
+The linear regression was computed strictly on late orders (`delay_days > 0`, **6,409 reviews**):
+
+- **Slope ($\\beta_1$)**: **-0.0160 stars per day late** ($p = 3.48e-32$).
 - **Intercept ($\\beta_0$)**: **2.44 stars** immediately upon breach of promised date.
-- **Score Drop (On-Time vs Late)**: On-time deliveries average **4.29 stars** with only **9.28% detractors**; minor delays (1-3 days) plummet average rating to **3.29 stars** with **32.17% detractors**.
+- **Immediate Threshold Drop**: Delivering on or before the estimated date yields **4.29 stars** (only 9.28% detractors). Crossing the estimated date causes an immediate discontinuous drop of **2.02 stars** down to **2.27 stars** (62.41% detractors), followed by an ongoing decay of **0.0160 stars** for each additional day late.
 
-> **Business Insight**: Crossing the estimated delivery threshold triggers an immediate, discontinuous penalty: customer satisfaction drops by **1.00 stars** on day 1 of delay, followed by a continuous decay of **0.0160 stars** per subsequent day.
+> **Business Insight**: Breaching the promised delivery date imposes an immediate 2.02-star penalty on customer satisfaction. Once late, CSAT decays by an additional 0.0160 stars per day.
 
 > **Actionable Recommendation**: Implement carrier dispatch tracking alerts on Day -2 prior to the SLA breach date, with proactive customer notification emails and automatic shipping vouchers for delayed deliveries to mitigate 1-star reviews.
 
@@ -169,12 +184,14 @@ Tracking monthly acquisition cohorts from January 2017 to December 2017 reveals 
 - **Holiday Spike**: Prominent outlier spike in late November 2017 corresponding to Black Friday.
 
 ### Holdout Validation Accuracy (Last 30 Days)
+- **Holdout Window**: **2018-07-22 to 2018-08-20** (30 operational days).
 - **Test Period Mean Daily Revenue**: **R$ 36,038.69**
 - **Forecasted Mean Daily Revenue**: **R$ 33,741.09**
 - **Mean Absolute Error (MAE)**: **R$ 4,647.90**
 - **Root Mean Squared Error (RMSE)**: **R$ 5,693.14**
 - **Weighted Absolute Percentage Error (WAPE)**: **12.90%**
-- **Mean Absolute Percentage Error (MAPE)**: **12.36%** on stable 30-day holdout validation.
+  $$\text{WAPE} = \frac{\text{MAE}}{\bar{y}_{\text{test}}} = \frac{4,647.90}{36,038.69} = 12.90\%$$
+- **Mean Absolute Percentage Error (MAPE)**: **12.36%**.
 
 ![Sales Forecast 30D](screenshots/sales_forecast_30d.png)
 

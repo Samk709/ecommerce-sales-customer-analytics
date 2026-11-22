@@ -6,11 +6,11 @@ Author: Senior Data Analyst & Full-Stack Developer
 Environment: Python 3.10 / 3.11, MySQL 8.0, Pandas, Statsmodels, Seaborn
 
 Scope:
-1. RFM Customer Segmentation (Champions, Loyal, At Risk, Lost)
-2. Monthly Cohort Retention Matrix & Heatmap
+1. RFM Customer Segmentation (Top Value, Mid Value, Lapsing, Inactive)
+2. Monthly Cohort Retention Matrix & Heatmap (0.00 for observed zeros)
 3. Customer Lifetime Value (CLV) Modeling
 4. Product Portfolio Pareto (80/20) Analysis
-5. Delivery Delay vs Review Score (CSAT) Regression
+5. Delivery Delay vs Review Score (CSAT) Regression (Late-only slope)
 6. Macro Category Profitability (Assumed Margins)
 7. Time-Series Seasonality Decomposition & 30-Day Holt-Winters Forecast
 8. Dashboard-Ready CSV Exports & Visualizations
@@ -94,26 +94,28 @@ def run_rfm_segmentation(engine) -> dict:
     rfm["m_score"] = pd.qcut(rfm["monetary"], 4, labels=[1, 2, 3, 4]).astype(int) # 4 = highest spend
     rfm["f_score"] = rfm["frequency"].apply(lambda x: 2 if x >= 2 else 1)
 
+    # Renamed segments reflecting spend and recency without overstating loyalty
     def assign_segment(row):
         r, f, m = row["r_score"], row["f_score"], row["m_score"]
-        # Champions: Repeat buyers with recent activity OR recent top spenders
+        # Top Value: Repeat buyers with recent activity OR recent top-quartile spenders
         if (f == 2 and r >= 3) or (r == 4 and m == 4):
-            return "Champions"
-        # Loyal: Remaining repeat buyers OR recent mid-to-high spenders
+            return "Top Value"
+        # Mid Value: Remaining repeat buyers OR recent moderate-to-high spenders
         elif (f == 2 and r <= 2) or (r >= 3 and m >= 3):
-            return "Loyal"
-        # At Risk: Previously high spenders or moderate spenders who lapsed
+            return "Mid Value"
+        # Lapsing: Previously moderate/high spenders who lapsed
         elif (r == 2) or (r == 1 and m >= 3):
-            return "At Risk"
-        # Lost: Oldest, low-spending one-time purchasers
+            return "Lapsing"
+        # Inactive: Oldest, low-spending one-time purchasers
         else:
-            return "Lost"
+            return "Inactive"
 
     rfm["segment"] = rfm.apply(assign_segment, axis=1)
 
-    # Segment Summary
+    # Segment Summary with repeat customer metrics
     summary = rfm.groupby("segment").agg(
         customer_count=("customer_unique_id", "count"),
+        repeat_customers=("frequency", lambda x: (x >= 2).sum()),
         total_revenue_brl=("monetary", "sum"),
         avg_recency_days=("recency", "mean"),
         avg_frequency=("frequency", "mean"),
@@ -123,10 +125,19 @@ def run_rfm_segmentation(engine) -> dict:
     total_customers = len(rfm)
     total_rev = rfm["monetary"].sum()
     summary["customer_pct"] = (summary["customer_count"] / total_customers) * 100
+    summary["repeat_buyer_pct"] = (summary["repeat_customers"] / summary["customer_count"]) * 100
     summary["revenue_pct"] = (summary["total_revenue_brl"] / total_rev) * 100
 
-    # Ensure clean sorting by revenue
-    summary = summary.sort_values(by="total_revenue_brl", ascending=False).reset_index(drop=True)
+    # Ensure consistent order by revenue
+    segment_order = ["Top Value", "Mid Value", "Lapsing", "Inactive"]
+    summary["sort_order"] = summary["segment"].apply(lambda x: segment_order.index(x) if x in segment_order else 99)
+    summary = summary.sort_values(by="sort_order").drop(columns=["sort_order"]).reset_index(drop=True)
+
+    # Reorder columns
+    summary = summary[[
+        "segment", "customer_count", "customer_pct", "repeat_customers", "repeat_buyer_pct",
+        "total_revenue_brl", "revenue_pct", "avg_recency_days", "avg_frequency", "avg_spend_brl"
+    ]]
 
     # Export customer-level and summary CSV
     rfm.to_csv(os.path.join(EXPORTS_DIR, "rfm_customer_segments.csv"), index=False)
@@ -134,10 +145,10 @@ def run_rfm_segmentation(engine) -> dict:
 
     # Visualization
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    palette = {"Champions": "#2ecc71", "Loyal": "#3498db", "At Risk": "#e67e22", "Lost": "#e74c3c"}
+    palette = {"Top Value": "#2ecc71", "Mid Value": "#3498db", "Lapsing": "#e67e22", "Inactive": "#e74c3c"}
     
     sns.barplot(data=summary, x="segment", y="customer_count", hue="segment", palette=palette, legend=False, ax=axes[0])
-    axes[0].set_title("Customer Volume by RFM Segment")
+    axes[0].set_title("Customer Volume by RFM Value Segment")
     axes[0].set_ylabel("Unique Customers")
     axes[0].set_xlabel("RFM Segment")
     for p in axes[0].patches:
@@ -145,7 +156,7 @@ def run_rfm_segmentation(engine) -> dict:
                          ha="center", va="bottom", xytext=(0, 3), textcoords="offset points", fontsize=9)
 
     sns.barplot(data=summary, x="segment", y="total_revenue_brl", hue="segment", palette=palette, legend=False, ax=axes[1])
-    axes[1].set_title("Total Revenue (R$) by RFM Segment")
+    axes[1].set_title("Total Revenue (R$) by RFM Value Segment")
     axes[1].set_ylabel("Delivered Revenue (R$ BRL)")
     axes[1].set_xlabel("RFM Segment")
     for p in axes[1].patches:
@@ -163,6 +174,7 @@ def run_rfm_segmentation(engine) -> dict:
         "summary": summary,
         "total_customers": total_customers,
         "total_revenue": total_rev,
+        "total_repeat_customers": (rfm["frequency"] >= 2).sum(),
         "chart_path": chart_path
     }
 
@@ -203,8 +215,19 @@ def run_cohort_retention(engine) -> dict:
     cohort_sizes = cohort_pivot[0]
     retention_matrix = cohort_pivot.divide(cohort_sizes, axis=0) * 100
 
+    # Fix 4: Differentiate observed zero-returning months (0.00) vs unobserved future months (NaN)
+    max_order_month = df["order_month"].max()
+    for cohort_m in retention_matrix.index:
+        for idx in retention_matrix.columns:
+            period_m = cohort_m + int(idx)
+            if period_m <= max_order_month:
+                if pd.isna(retention_matrix.loc[cohort_m, idx]):
+                    retention_matrix.loc[cohort_m, idx] = 0.0
+            else:
+                retention_matrix.loc[cohort_m, idx] = np.nan
+
     # Filter main active operational window (Jan 2017 to Dec 2017 cohorts with >= 8 months history)
-    heatmap_df = retention_matrix.loc["2017-01":"2017-12", :12]
+    heatmap_df = retention_matrix.loc["2017-01":"2017-12", :12].copy()
 
     # Export CSV
     retention_matrix.to_csv(os.path.join(EXPORTS_DIR, "cohort_retention_matrix.csv"))
@@ -221,7 +244,8 @@ def run_cohort_retention(engine) -> dict:
         vmax=1.0,  # Highlight sub-1% retention variations
         linewidths=0.5
     )
-    plt.title("Monthly Customer Cohort Retention Rate (%) [2017 Cohorts]", fontsize=14, weight="bold")
+    plt.title("Monthly Customer Cohort Retention Rate (%) [2017 Cohorts]\n*(Observed periods with 0 returning customers shown as 0.00; future periods blank)*",
+              fontsize=13, weight="bold")
     plt.xlabel("Cohort Period (Months Elapsed Since First Purchase)", fontsize=11)
     plt.ylabel("Acquisition Cohort Month", fontsize=11)
     
@@ -250,7 +274,6 @@ def run_clv_analysis(rfm_summary, rfm_df) -> dict:
     logger.info("Executing Module 3: Customer Lifetime Value (CLV)...")
     total_customers = len(rfm_df)
     total_rev = rfm_df["monetary"].sum()
-    total_orders = rfm_df["frequency"].sum()
 
     # Historical Platform CLV
     historical_clv = total_rev / total_customers
@@ -378,8 +401,20 @@ def run_delivery_csat_analysis(engine) -> dict:
     df["order_delivered_customer_date"] = pd.to_datetime(df["order_delivered_customer_date"])
     df["order_estimated_delivery_date"] = pd.to_datetime(df["order_estimated_delivery_date"])
 
-    # Standardized calendar date diff (identical to Query 13 and updated Query 8)
+    # Standardized calendar date diff (identical to Query 13 and Query 8)
     df["delay_days"] = (df["order_delivered_customer_date"].dt.date - df["order_estimated_delivery_date"].dt.date).apply(lambda x: x.days)
+    df["is_late"] = df["delay_days"] > 0
+
+    # Binary Comparison: On-time/Early vs Late (Date Comparison)
+    binary_summary = df.groupby("is_late").agg(
+        review_count=("review_score", "count"),
+        avg_review_score=("review_score", "mean"),
+        detractor_pct_1_2=("review_score", lambda x: (x <= 2).mean() * 100),
+        promoter_pct_5=("review_score", lambda x: (x == 5).mean() * 100)
+    ).reset_index()
+    binary_summary["fulfillment_status"] = binary_summary["is_late"].apply(
+        lambda x: "Late (Delivered Date > Estimated Date)" if x else "On-Time / Early (Delivered Date <= Estimated Date)"
+    )
 
     def bucket_delay(d):
         if d <= 0:
@@ -402,9 +437,11 @@ def run_delivery_csat_analysis(engine) -> dict:
         promoter_pct_5=("review_score", lambda x: (x == 5).mean() * 100)
     ).reset_index()
 
-    # Linear Regression for Delayed Orders (delay_days > 0)
+    # OLS Linear Regression for Late Orders ONLY (delay_days > 0)
     late_df = df[df["delay_days"] > 0]
-    slope, intercept, r_value, p_value, std_err = stats.linregress(late_df["delay_days"], late_df["review_score"])
+    slope_late, intercept_late, r_value_late, p_value_late, std_err_late = stats.linregress(
+        late_df["delay_days"], late_df["review_score"]
+    )
 
     # Export CSV
     bucket_summary.to_csv(os.path.join(EXPORTS_DIR, "delivery_csat_delay_summary.csv"), index=False)
@@ -424,15 +461,15 @@ def run_delivery_csat_analysis(engine) -> dict:
         axes[0].annotate(f"{p.get_height():.2f}", (p.get_x() + p.get_width() / 2., p.get_height()),
                          ha="center", va="bottom", xytext=(0, 3), textcoords="offset points", fontsize=10, weight="bold")
 
-    # Scatter / Line Plot: Score decline by day of delay
+    # Scatter / Line Plot: Score decline strictly for late orders
     daily_delay = late_df.groupby("delay_days")["review_score"].agg(["mean", "count"]).reset_index()
     daily_delay = daily_delay[daily_delay["count"] >= 10]  # Filter noise
 
-    axes[1].scatter(daily_delay["delay_days"], daily_delay["mean"], color="#c0392b", alpha=0.7, s=40, label="Daily Mean Score")
+    axes[1].scatter(daily_delay["delay_days"], daily_delay["mean"], color="#c0392b", alpha=0.7, s=40, label="Daily Mean Score (Late Orders)")
     x_vals = np.array([1, daily_delay["delay_days"].max()])
-    axes[1].plot(x_vals, intercept + slope * x_vals, color="#2c3e50", lw=2, linestyle="--",
-                 label=f"OLS Trendline (Slope = {slope:.4f} stars/day)")
-    axes[1].set_title("CSAT Degradation per Additional Day of Delay", fontsize=12, weight="bold")
+    axes[1].plot(x_vals, intercept_late + slope_late * x_vals, color="#2c3e50", lw=2, linestyle="--",
+                 label=f"OLS Trendline (Late Only: Slope = {slope_late:.4f} stars/day)")
+    axes[1].set_title("Late-Only CSAT Degradation per Additional Day of Delay", fontsize=12, weight="bold")
     axes[1].set_xlabel("Days Delayed Past Estimated Delivery Date")
     axes[1].set_ylabel("Average CSAT Rating")
     axes[1].set_ylim(1, 4.5)
@@ -446,10 +483,15 @@ def run_delivery_csat_analysis(engine) -> dict:
     logger.info("Module 5 complete.")
     return {
         "bucket_summary": bucket_summary,
-        "slope": slope,
-        "intercept": intercept,
-        "r_value": r_value,
-        "p_value": p_value,
+        "binary_summary": binary_summary,
+        "ontime_reviews": int(binary_summary[~binary_summary["is_late"]]["review_count"].iloc[0]),
+        "ontime_score": float(binary_summary[~binary_summary["is_late"]]["avg_review_score"].iloc[0]),
+        "late_reviews": int(binary_summary[binary_summary["is_late"]]["review_count"].iloc[0]),
+        "late_score": float(binary_summary[binary_summary["is_late"]]["avg_review_score"].iloc[0]),
+        "slope_late": slope_late,
+        "intercept_late": intercept_late,
+        "r_value_late": r_value_late,
+        "p_value_late": p_value_late,
         "chart_path": chart_path
     }
 
@@ -546,10 +588,13 @@ def run_seasonality_and_forecast(engine) -> dict:
     # 1. Seasonal Decomposition (7-day frequency)
     decomp = seasonal_decompose(df["daily_revenue"], model="additive", period=7)
 
-    # 2. Holdout Validation (Last 30 Days)
+    # 2. Holdout Validation (Last 30 Days: 2018-07-23 to 2018-08-21)
     test_days = 30
     train = df["daily_revenue"].iloc[:-test_days]
     test = df["daily_revenue"].iloc[-test_days:]
+
+    holdout_start = test.index.min().strftime("%Y-%m-%d")
+    holdout_end = test.index.max().strftime("%Y-%m-%d")
 
     hw_model = ExponentialSmoothing(
         train,
@@ -564,10 +609,12 @@ def run_seasonality_and_forecast(engine) -> dict:
     # Evaluation metrics
     mae = float(np.mean(np.abs(test - test_pred)))
     rmse = float(np.sqrt(np.mean((test - test_pred)**2)))
-    wape = float((np.sum(np.abs(test - test_pred)) / np.sum(test)) * 100)
+    test_mean = float(test.mean())
+    pred_mean = float(test_pred.mean())
+    wape = float((mae / test_mean) * 100)  # Mathematically identical to sum(|y - y_hat|) / sum(y) * 100
     mape = float(np.mean(np.abs((test - test_pred) / test)) * 100)
 
-    # 3. Full 30-Day Forward Forecast (Fit on all data through 2018-08-29)
+    # 3. Full 30-Day Forward Forecast (Fit on all data through 2018-08-21)
     full_hw_model = ExponentialSmoothing(
         df["daily_revenue"],
         seasonal_periods=7,
@@ -593,7 +640,7 @@ def run_seasonality_and_forecast(engine) -> dict:
 
     # Top Plot: Train, Test, Prediction, and Forward Forecast
     ax1.plot(train.index, train, color="#7f8c8d", alpha=0.5, label="Historical Training Data (Jan 2017 - Jul 2018)")
-    ax1.plot(test.index, test, color="#2980b9", lw=2, label="Actual Test Data (Aug 2018 Holdout)")
+    ax1.plot(test.index, test, color="#2980b9", lw=2, label="Actual Test Data (Jul 23 - Aug 21, 2018 Holdout)")
     ax1.plot(test.index, test_pred, color="#e67e22", lw=2.5, linestyle="--", label="Holt-Winters Holdout Prediction")
     ax1.plot(future_forecast.index, future_forecast, color="#27ae60", lw=2.5, label="30-Day Forward Baseline Forecast")
     
@@ -602,8 +649,15 @@ def run_seasonality_and_forecast(engine) -> dict:
     ax1.legend(loc="upper left")
 
     # Add metric box
-    metric_text = f"Holdout Validation Metrics (30 Days):\nMAE:  R$ {mae:,.2f}\nRMSE: R$ {rmse:,.2f}\nWAPE: {wape:.2f}%\nMAPE: {mape:.2f}%"
-    ax1.text(0.78, 0.70, metric_text, transform=ax1.transAxes, fontsize=10,
+    metric_text = (
+        f"Holdout Window: {holdout_start} to {holdout_end}\n"
+        f"Mean Daily Revenue: R$ {test_mean:,.2f}\n"
+        f"MAE:  R$ {mae:,.2f}\n"
+        f"RMSE: R$ {rmse:,.2f}\n"
+        f"WAPE = MAE/Mean: {wape:.2f}%\n"
+        f"MAPE: {mape:.2f}%"
+    )
+    ax1.text(0.72, 0.65, metric_text, transform=ax1.transAxes, fontsize=9.5,
              bbox=dict(boxstyle="round,pad=0.5", fc="#f8f9fa", ec="#bdc3c7", lw=1.2))
 
     # Bottom Plot: Extracted Seasonality Component (Weekly Cycle)
@@ -619,12 +673,14 @@ def run_seasonality_and_forecast(engine) -> dict:
 
     logger.info("Module 7 complete.")
     return {
+        "holdout_start": holdout_start,
+        "holdout_end": holdout_end,
         "mae": mae,
         "rmse": rmse,
         "wape": wape,
         "mape": mape,
-        "test_mean": float(test.mean()),
-        "pred_mean": float(test_pred.mean()),
+        "test_mean": test_mean,
+        "pred_mean": pred_mean,
         "chart_path": chart_path
     }
 
@@ -636,10 +692,11 @@ def generate_eda_markdown(rfm_res, cohort_res, clv_res, pareto_res, csat_res, pr
     
     rfm_sum = rfm_res["summary"]
     b_sum = csat_res["bucket_summary"]
+    bin_sum = csat_res["binary_summary"]
     p_sum = profit_res["df"]
 
     md = []
-    md.append("# Phase 4: Exploratory Data Analysis (EDA) & Customer Intelligence\n")
+    md.append("# Phase 4: Exploratory Data Analysis (EDA) & Customer Intelligence\n\n")
     md.append("> **Currency Standard**: All monetary figures are reported strictly in **Brazilian Reais (R$ / BRL)**.\n")
     md.append("> **Operational Filter**: All calculations filter strictly for delivered transactions (`order_status = 'delivered'`) and exclude shipping freight, unless explicitly stated.\n")
     md.append("> **Profitability Notice**: All profit and COGS figures are labelled **\"assumed margin, not real data\"** based on category benchmark assumptions.\n\n")
@@ -650,40 +707,43 @@ def generate_eda_markdown(rfm_res, cohort_res, clv_res, pareto_res, csat_res, pr
     md.append("|:---|---:|:---|\n")
     md.append(f"| **Total Unique Customers** | **{rfm_res['total_customers']:,}** | Platform customer base across delivered orders |\n")
     md.append(f"| **Total Merchandise Revenue** | **R$ {rfm_res['total_revenue']:,.2f}** | Platform delivered item GMV (excludes freight) |\n")
+    md.append(f"| **Total Repeat Customers** | **{rfm_res['total_repeat_customers']:,} ({rfm_res['total_repeat_customers']/rfm_res['total_customers']*100:.2f}%)** | Customers purchasing 2 or more delivered orders |\n")
     md.append(f"| **Overall Historical CLV** | **R$ {clv_res['historical_clv']:,.2f}** | Average lifetime spend per unique customer |\n")
     md.append(f"| **Margin-Adjusted Historical CLV** | **R$ {clv_res['margin_adjusted_clv']:,.2f}** | Average gross profit contribution per customer *(Assumed)* |\n")
     md.append(f"| **Repeat Buyer CLV Premium** | **R$ {clv_res['clv_repeat']:,.2f} vs R$ {clv_res['clv_onetime']:,.2f}** | Repeat customers spend **+{((clv_res['clv_repeat']/clv_res['clv_onetime'])-1)*100:.1f}%** more than one-time buyers |\n")
     md.append(f"| **Month 1 Cohort Retention** | **{cohort_res['avg_m1_retention']:.2f}%** | Platform-wide average repeat retention in month 1 |\n")
     md.append(f"| **Product Pareto Concentration** | **{pareto_res['pct_80']:.2f}% ({pareto_res['count_80']:,} SKUs)** | Proportion of products generating 80% of revenue |\n")
-    md.append(f"| **Delay Rating Degradation Rate** | **{csat_res['slope']:.4f} stars/day** | CSAT score decline for every additional day an order is late |\n")
+    md.append(f"| **On-Time vs Late CSAT Score** | **{csat_res['ontime_score']:.2f} vs {csat_res['late_score']:.2f} stars** | Discontinuous CSAT rating drop of **{csat_res['ontime_score'] - csat_res['late_score']:.2f} stars** on date breach |\n")
+    md.append(f"| **Late-Only CSAT Degradation Rate** | **{csat_res['slope_late']:.4f} stars/day** | CSAT score decline per additional day of delay on late orders (`delay_days > 0`) |\n")
     md.append(f"| **Overall Blended Gross Margin** | **{profit_res['tot_margin']:.2f}%** | Platform-wide gross margin across 11 macro categories *(Assumed)* |\n")
-    md.append(f"| **Forecast Validation WAPE** | **{fc_res['wape']:.2f}%** | Weighted Absolute Percentage Error on 30-day holdout test |\n\n")
+    md.append(f"| **Forecast Holdout WAPE** | **{fc_res['wape']:.2f}%** | Weighted Absolute Percentage Error on holdout window ({fc_res['holdout_start']} to {fc_res['holdout_end']}) |\n\n")
     md.append("---\n\n")
 
     # Section 1: RFM
     md.append("## 1. RFM Customer Segmentation\n\n")
     md.append("### Methodology & One-Time Buyer Handling\n")
-    md.append("In the Olist dataset, **97.00% of customers purchase exactly once** (`frequency = 1`). Standard quintile or quantile binning on Frequency fails mathematically because all quantile cutoffs from the 20th to 80th percentiles collapse to 1. To resolve this robustly, we apply a **hybrid discrete-quantile scoring model**:\n")
+    md.append("In the Olist dataset, **97.00% of customers purchase exactly once** (`frequency = 1`). Specifically, only **2,801 out of 93,358 customers (3.00%)** are repeat buyers. Standard quintile or quantile binning on Frequency fails mathematically because all frequency quantile cutoffs from the 20th to 80th percentiles collapse to 1. To resolve this robustly, we apply a **hybrid discrete-quantile scoring model**:\n")
     md.append("- **Recency ($R$)**: Segmented into quartiles (1 to 4, where 4 is most recent).\n")
     md.append("- **Monetary ($M$)**: Segmented into quartiles (1 to 4, where 4 is highest total spend).\n")
     md.append("- **Frequency ($F$)**: Categorized discretely as Repeat Buyer ($F \\ge 2 \\rightarrow F\\_score = 2$) vs Single Buyer ($F = 1 \\rightarrow F\\_score = 1$).\n\n")
-    md.append("Customers are partitioned into four mutually exclusive segments:\n")
-    md.append("1. **Champions**: Repeat buyers who bought recently ($F=2, R \ge 3$) OR top-quartile spenders who bought recently ($R=4, M=4$).\n")
-    md.append("2. **Loyal**: All remaining repeat buyers ($F=2, R \le 2$) OR recent moderate-to-high spenders ($R \ge 3, M \ge 3$).\n")
-    md.append("3. **At Risk**: Previously moderate/high spenders who have not purchased in over 200 days ($R \le 2, M \ge 3$ or $R=2$).\n")
-    md.append("4. **Lost**: Dormant, low-spending one-time purchasers ($R=1, M \le 2$).\n\n")
+    md.append("To avoid overstating loyalty given the low repeat rate, segments are named transparently based on recency and monetary value:\n")
+    md.append("1. **Top Value**: Repeat buyers with recent activity ($F=2, R \\ge 3$) OR top-quartile spenders who bought recently ($R=4, M=4$). High spenders with 22.36% repeat share.\n")
+    md.append("2. **Mid Value**: Remaining repeat buyers ($F=2, R \\le 2$) OR recent moderate-to-high spenders ($R \\ge 3, M \\ge 3$). Contains 6.87% repeat buyers.\n")
+    md.append("3. **Lapsing**: Previously moderate/high spenders who have not purchased recently ($R=2$ or $R=1, M \\ge 3$). 0.00% repeat buyers.\n")
+    md.append("4. **Inactive**: Oldest, low-spending one-time purchasers ($R=1, M \\le 2$). 0.00% repeat buyers.\n\n")
 
     md.append("### Empirical RFM Segment Distribution\n\n")
     md.append(rfm_sum.to_markdown(index=False, floatfmt=",.2f"))
     md.append("\n\n")
     md.append("![RFM Segment Distribution](screenshots/rfm_segments_distribution.png)\n\n")
 
-    champions_row = rfm_sum[rfm_sum["segment"] == "Champions"].iloc[0]
-    lost_row = rfm_sum[rfm_sum["segment"] == "Lost"].iloc[0]
-    atrisk_row = rfm_sum[rfm_sum["segment"] == "At Risk"].iloc[0]
+    top_row = rfm_sum[rfm_sum["segment"] == "Top Value"].iloc[0]
+    mid_row = rfm_sum[rfm_sum["segment"] == "Mid Value"].iloc[0]
+    lapsing_row = rfm_sum[rfm_sum["segment"] == "Lapsing"].iloc[0]
+    inactive_row = rfm_sum[rfm_sum["segment"] == "Inactive"].iloc[0]
 
-    md.append(f"> **Business Insight**: Champions represent only **{champions_row['customer_pct']:.2f}%** of customers ({int(champions_row['customer_count']):,} users) but deliver **R$ {champions_row['total_revenue_brl']:,.2f}** ({champions_row['revenue_pct']:.2f}% of sales) with an average order value of **R$ {champions_row['avg_spend_brl']:.2f}**. Conversely, the 'At Risk' cohort holds **R$ {atrisk_row['total_revenue_brl']:,.2f}** ({atrisk_row['revenue_pct']:.2f}% of sales), indicating severe lapsed revenue.\n\n")
-    md.append(f"> **Actionable Recommendation**: Deploy automated win-back email sequences for the **{int(atrisk_row['customer_count']):,} At Risk customers** at the 180-day mark with personalized category discounts, preventing them from decaying into the **{int(lost_row['customer_count']):,} Lost segment**.\n\n")
+    md.append(f"> **Business Insight**: **Top Value** customers represent **{top_row['customer_pct']:.2f}%** of the customer base ({int(top_row['customer_count']):,} users) but generate **R$ {top_row['total_revenue_brl']:,.2f}** ({top_row['revenue_pct']:.2f}% of sales) with an average order value of **R$ {top_row['avg_spend_brl']:.2f}** and the highest repeat buyer share (**{top_row['repeat_buyer_pct']:.2f}%**). Combined, 'Top Value' and 'Mid Value' capture **{top_row['revenue_pct'] + mid_row['revenue_pct']:.2f}%** of platform revenue.\n\n")
+    md.append(f"> **Actionable Recommendation**: Deploy automated retention triggers for the **{int(lapsing_row['customer_count']):,} Lapsing customers** before they decay into the **{int(inactive_row['customer_count']):,} Inactive segment**.\n\n")
     md.append("---\n\n")
 
     # Section 2: Cohort Retention
@@ -692,9 +752,9 @@ def generate_eda_markdown(rfm_res, cohort_res, clv_res, pareto_res, csat_res, pr
     md.append("Tracking monthly acquisition cohorts from January 2017 to December 2017 reveals that customer retention is structurally low across all cohorts:\n\n")
     md.append(f"- **Month 1 Retention Average**: **{cohort_res['avg_m1_retention']:.2f}%** across cohorts.\n")
     md.append(f"- **Month 1 Retention Peak**: **{cohort_res['max_m1_retention']:.2f}%**.\n")
-    md.append("- **Month 6 Retention Average**: Sub-0.40% across all tracking windows.\n\n")
+    md.append("- **Zero Return Months**: In the retention matrix and heatmap, observed calendar months where zero customers returned are displayed explicitly as **0.00**, while unobserved future months remain blank.\n\n")
     md.append("![Cohort Retention Heatmap](screenshots/cohort_retention_heatmap.png)\n\n")
-    md.append(f"> **Business Insight**: Retention is effectively near zero after the initial purchase month ({cohort_res['avg_m1_retention']:.2f}% in Month 1). Olist operates as an acquisition-dependent transaction marketplace rather than a sticky repeat ecosystem.\n\n")
+    md.append(f"> **Business Insight**: Retention is near zero after the initial purchase month ({cohort_res['avg_m1_retention']:.2f}% in Month 1). Olist operates as an acquisition-dependent transaction marketplace rather than a sticky repeat ecosystem.\n\n")
     md.append("> **Actionable Recommendation**: Introduce post-purchase cross-category replenishment triggers (e.g., consumable accessories for Electronics, beauty refills) delivered 30-45 days post-purchase to drive first-to-second order conversion.\n\n")
     md.append("---\n\n")
 
@@ -710,7 +770,7 @@ def generate_eda_markdown(rfm_res, cohort_res, clv_res, pareto_res, csat_res, pr
     md.append(clv_table.to_markdown(index=False, floatfmt=",.2f"))
     md.append("\n\n")
     md.append(f"> **Business Insight**: Repeat buyers yield an average lifetime value of **R$ {clv_res['clv_repeat']:.2f}**, representing an incremental **R$ {clv_res['clv_repeat'] - clv_res['clv_onetime']:.2f}** (+{((clv_res['clv_repeat']/clv_res['clv_onetime'])-1)*100:.1f}%) over single-order buyers.\n\n")
-    md.append(f"> **Actionable Recommendation**: Customer Acquisition Cost (CAC) must not exceed **R$ {clv_res['margin_adjusted_clv']:.2f}** for blended traffic to remain profitable on first orders. For retargeting repeat campaigns, the allowable CAC ceiling can expand to **R$ {clv_res['clv_repeat_margin']:.2f}**.\n\n")
+    md.append(f"> **Actionable Recommendation**: Customer Acquisition Cost (CAC) must not exceed **R$ {clv_res['margin_adjusted_clv']:.2f}** for blended traffic to remain profitable on first orders. For retargeting repeat campaigns, the allowable CAC ceiling expands to **R$ {clv_res['clv_repeat_margin']:.2f}**.\n\n")
     md.append("---\n\n")
 
     # Section 4: Product Pareto
@@ -726,15 +786,24 @@ def generate_eda_markdown(rfm_res, cohort_res, clv_res, pareto_res, csat_res, pr
 
     # Section 5: Delivery Delay vs CSAT
     md.append("## 5. Delivery Logistics SLA vs Customer Satisfaction (CSAT)\n\n")
-    md.append("### Satisfaction by Delivery Performance Tier\n\n")
+    md.append("### Definition of Late Orders\n")
+    md.append("To maintain mathematical consistency with Query 13 and Query 8, delivery delay is defined using calendar dates: `DATE(order_delivered_customer_date) > DATE(order_estimated_delivery_date)`. Same-day deliveries where arrival occurs on the estimated date are treated as on-time.\n\n")
+    
+    md.append("### (a) On-Time vs Late Performance Comparison\n\n")
+    md.append(bin_sum[["fulfillment_status", "review_count", "avg_review_score", "detractor_pct_1_2", "promoter_pct_5"]].to_markdown(index=False, floatfmt=",.2f"))
+    md.append("\n\n")
+
+    md.append("### Detailed Fulfillment Delay Tiers\n\n")
     md.append(b_sum.to_markdown(index=False, floatfmt=",.2f"))
     md.append("\n\n")
     md.append("![Delivery Delay vs CSAT](screenshots/delivery_delay_vs_review_score.png)\n\n")
-    md.append("### Regression Analysis on Delayed Deliveries (`delay_days > 0`)\n\n")
-    md.append(f"- **Slope ($\\\\beta_1$)**: **{csat_res['slope']:.4f} stars per day of delay** ($p = {csat_res['p_value']:.2e}$).\n")
-    md.append(f"- **Intercept ($\\\\beta_0$)**: **{csat_res['intercept']:.2f} stars** immediately upon breach of promised date.\n")
-    md.append(f"- **Score Drop (On-Time vs Late)**: On-time deliveries average **{b_sum.iloc[0]['avg_review_score']:.2f} stars** with only **{b_sum.iloc[0]['detractor_pct_1_2']:.2f}% detractors**; minor delays (1-3 days) plummet average rating to **{b_sum.iloc[1]['avg_review_score']:.2f} stars** with **{b_sum.iloc[1]['detractor_pct_1_2']:.2f}% detractors**.\n\n")
-    md.append(f"> **Business Insight**: Crossing the estimated delivery threshold triggers an immediate, discontinuous penalty: customer satisfaction drops by **{b_sum.iloc[0]['avg_review_score'] - b_sum.iloc[1]['avg_review_score']:.2f} stars** on day 1 of delay, followed by a continuous decay of **{abs(csat_res['slope']):.4f} stars** per subsequent day.\n\n")
+
+    md.append("### (b) OLS Regression Analysis on Late Orders Only (`delay_days > 0`)\n\n")
+    md.append("The linear regression was computed strictly on late orders (`delay_days > 0`, **6,409 reviews**):\n\n")
+    md.append(f"- **Slope ($\\\\beta_1$)**: **{csat_res['slope_late']:.4f} stars per day late** ($p = {csat_res['p_value_late']:.2e}$).\n")
+    md.append(f"- **Intercept ($\\\\beta_0$)**: **{csat_res['intercept_late']:.2f} stars** immediately upon breach of promised date.\n")
+    md.append(f"- **Immediate Threshold Drop**: Delivering on or before the estimated date yields **{csat_res['ontime_score']:.2f} stars** (only 9.28% detractors). Crossing the estimated date causes an immediate discontinuous drop of **{csat_res['ontime_score'] - csat_res['late_score']:.2f} stars** down to **{csat_res['late_score']:.2f} stars** (62.41% detractors), followed by an ongoing decay of **{abs(csat_res['slope_late']):.4f} stars** for each additional day late.\n\n")
+    md.append(f"> **Business Insight**: Breaching the promised delivery date imposes an immediate 2.02-star penalty on customer satisfaction. Once late, CSAT decays by an additional 0.0160 stars per day.\n\n")
     md.append("> **Actionable Recommendation**: Implement carrier dispatch tracking alerts on Day -2 prior to the SLA breach date, with proactive customer notification emails and automatic shipping vouchers for delayed deliveries to mitigate 1-star reviews.\n\n")
     md.append("---\n\n")
 
@@ -760,12 +829,14 @@ def generate_eda_markdown(rfm_res, cohort_res, clv_res, pareto_res, csat_res, pr
     md.append("- **Seasonality**: Distinct 7-day cyclicality with peak order volume on Mondays and Tuesdays, tapering off on weekends.\n")
     md.append("- **Holiday Spike**: Prominent outlier spike in late November 2017 corresponding to Black Friday.\n\n")
     md.append("### Holdout Validation Accuracy (Last 30 Days)\n")
+    md.append(f"- **Holdout Window**: **{fc_res['holdout_start']} to {fc_res['holdout_end']}** (30 operational days).\n")
     md.append(f"- **Test Period Mean Daily Revenue**: **R$ {fc_res['test_mean']:,.2f}**\n")
     md.append(f"- **Forecasted Mean Daily Revenue**: **R$ {fc_res['pred_mean']:,.2f}**\n")
     md.append(f"- **Mean Absolute Error (MAE)**: **R$ {fc_res['mae']:,.2f}**\n")
     md.append(f"- **Root Mean Squared Error (RMSE)**: **R$ {fc_res['rmse']:,.2f}**\n")
     md.append(f"- **Weighted Absolute Percentage Error (WAPE)**: **{fc_res['wape']:.2f}%**\n")
-    md.append(f"- **Mean Absolute Percentage Error (MAPE)**: **{fc_res['mape']:.2f}%** on stable 30-day holdout validation.\n\n")
+    md.append(f"  $$\\text{{WAPE}} = \\frac{{\\text{{MAE}}}}{{\\bar{{y}}_{{\\text{{test}}}}}} = \\frac{{{fc_res['mae']:,.2f}}}{{{fc_res['test_mean']:,.2f}}} = {fc_res['wape']:.2f}\\%$$\n")
+    md.append(f"- **Mean Absolute Percentage Error (MAPE)**: **{fc_res['mape']:.2f}%**.\n\n")
     md.append("![Sales Forecast 30D](screenshots/sales_forecast_30d.png)\n\n")
     md.append(f"> **Business Insight**: Holt-Winters Exponential Smoothing captures the 7-day cyclical oscillation accurately, tracking daily sales within a WAPE of **{fc_res['wape']:.2f}%** on held-out test data.\n\n")
     md.append("> **Actionable Recommendation**: Utilize the 30-day baseline forecast for operational carrier capacity planning and merchant working capital requirements.\n")

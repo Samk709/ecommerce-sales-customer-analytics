@@ -11,26 +11,33 @@ import numpy as np
 EXPORTS_DIR = "data/exports"
 
 def test_rfm_customer_count_and_revenue_integrity():
-    """Verify RFM customer counts sum to 93,358 and revenue sums to R$ 13,221,498.11."""
+    """Verify RFM customer counts sum to 93,358, repeat buyers sum to 2,801, and revenue sums to R$ 13,221,498.11."""
     rfm_path = os.path.join(EXPORTS_DIR, "rfm_customer_segments.csv")
     assert os.path.exists(rfm_path), "rfm_customer_segments.csv does not exist"
     
     df = pd.read_csv(rfm_path)
     assert len(df) == 93358
     assert abs(df["monetary"].sum() - 13221498.11) <= 0.05
+    assert (df["frequency"] >= 2).sum() == 2801
     
     summary_path = os.path.join(EXPORTS_DIR, "rfm_segment_summary.csv")
     assert os.path.exists(summary_path), "rfm_segment_summary.csv does not exist"
     
     summary = pd.read_csv(summary_path)
     assert summary["customer_count"].sum() == 93358
+    assert summary["repeat_customers"].sum() == 2801
     assert abs(summary["total_revenue_brl"].sum() - 13221498.11) <= 0.05
     
-    expected_segments = {"Champions", "Loyal", "At Risk", "Lost"}
+    expected_segments = {"Top Value", "Mid Value", "Lapsing", "Inactive"}
     assert set(summary["segment"]) == expected_segments
+    
+    # Verify repeat buyer share calculations
+    for _, row in summary.iterrows():
+        expected_repeat_pct = round((row["repeat_customers"] / row["customer_count"]) * 100, 2)
+        assert round(row["repeat_buyer_pct"], 2) == expected_repeat_pct
 
 def test_cohort_retention_structure_and_bounds():
-    """Verify cohort retention matrix structure and validate that retention rates are bounded."""
+    """Verify cohort retention matrix structure, zero-value handling for observed periods, and bounded rates."""
     cohort_path = os.path.join(EXPORTS_DIR, "cohort_retention_matrix.csv")
     assert os.path.exists(cohort_path), "cohort_retention_matrix.csv does not exist"
     
@@ -38,10 +45,14 @@ def test_cohort_retention_structure_and_bounds():
     # Check that Month 0 is 100.0% for all cohorts
     assert (df["0"] == 100.0).all()
     
-    # Check that subsequent months are between 0 and 100%
+    # Check that observed subsequent months are between 0 and 100%
     subsequent = df.drop(columns=["0"])
     valid_rates = subsequent.dropna().values
     assert (valid_rates >= 0.0).all() and (valid_rates <= 100.0).all()
+    
+    # Check that observed zero months contain 0.0 (not null)
+    # E.g., for early cohorts (2016-09 or 2016-10), there are observed months with 0.0
+    assert (subsequent == 0.0).any().any()
     
     # Average Month 1 retention across cohorts should be structurally low (< 1.0%)
     m1_rates = df.loc["2017-01":"2017-12", "1"].dropna()
@@ -90,6 +101,10 @@ def test_delivery_csat_delay_summary():
     minor_delay_score = df.iloc[1]["avg_review_score"]
     assert ontime_score > minor_delay_score
     assert round(ontime_score, 2) == 4.29
+    
+    # Late reviews sum to 6,409
+    late_reviews = df.iloc[1:]["review_count"].sum()
+    assert late_reviews == 6409
 
 def test_category_profitability_summary():
     """Verify macro category profitability reconciliation against Phase 3 totals."""
