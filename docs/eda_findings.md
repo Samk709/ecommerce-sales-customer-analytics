@@ -27,15 +27,53 @@
 
 ### Methodology & One-Time Buyer Handling
 In the Olist dataset, **97.00% of customers purchase exactly once** (`frequency = 1`). Specifically, only **2,801 out of 93,358 customers (3.00%)** are repeat buyers. Standard quintile or quantile binning on Frequency fails mathematically because all frequency quantile cutoffs from the 20th to 80th percentiles collapse to 1. To resolve this robustly, we apply a **hybrid discrete-quantile scoring model**:
-- **Recency ($R$)**: Segmented into quartiles (1 to 4, where 4 is most recent).
-- **Monetary ($M$)**: Segmented into quartiles (1 to 4, where 4 is highest total spend).
-- **Frequency ($F$)**: Categorized discretely as Repeat Buyer ($F \ge 2 \rightarrow F\_score = 2$) vs Single Buyer ($F = 1 \rightarrow F\_score = 1$).
 
-To avoid overstating loyalty given the low repeat rate, segments are named transparently based on recency and monetary value:
-1. **Top Value**: Repeat buyers with recent activity ($F=2, R \ge 3$) OR top-quartile spenders who bought recently ($R=4, M=4$). High spenders with 22.36% repeat share.
-2. **Mid Value**: Remaining repeat buyers ($F=2, R \le 2$) OR recent moderate-to-high spenders ($R \ge 3, M \ge 3$). Contains 6.87% repeat buyers.
-3. **Lapsing**: Previously moderate/high spenders who have not purchased recently ($R=2$ or $R=1, M \ge 3$). 0.00% repeat buyers.
-4. **Inactive**: Oldest, low-spending one-time purchasers ($R=1, M \le 2$). 0.00% repeat buyers.
+#### Exact Quartile Thresholds & Dimension Scoring
+
+| Dimension | Score | Quartile / Category | Exact Cutoff Range | Business Meaning |
+|:---|:---:|:---|:---|:---|
+| **Recency ($R$)** | **4** | Quartile 1 (Top 25%) | 1 to 114 days | Most recent purchases |
+| | **3** | Quartile 2 | 115 to 219 days | Moderately recent purchases |
+| | **2** | Quartile 3 | 220 to 346 days | Lapsing / aging purchases |
+| | **1** | Quartile 4 (Bottom 25%) | 347 to 714 days | Oldest historical purchases |
+| **Monetary ($M$)** | **4** | Quartile 4 (Top 25%) | R$ 154.75 to R$ 13,440.00 | High spenders |
+| | **3** | Quartile 3 | R$ 89.74 to R$ 154.74 | Upper-moderate spenders |
+| | **2** | Quartile 2 | R$ 47.66 to R$ 89.73 | Lower-moderate spenders |
+| | **1** | Quartile 1 (Bottom 25%) | R$ 0.85 to R$ 47.65 | Low spenders |
+| **Frequency ($F$)** | **2** | Repeat Buyer | $\ge 2$ delivered orders | Multi-order customer (2,801 users = 3.00%) |
+| | **1** | Single Buyer | 1 delivered order | One-time buyer (90,557 users = 97.00%) |
+
+#### Exact Segment Assignment Rules & Logic
+
+Segments are assigned using the following mutually exclusive rules evaluated in order:
+
+1. **Top Value**:
+   - **Rule**: `(F == 2 AND R >= 3) OR (R == 4 AND M == 4)`
+   - **Logic**: Captures active repeat buyers who ordered within 219 days (`F=2, R>=3`, 1,549 users) OR single-order buyers who transacted within 114 days and spent $\ge$ R$ 154.75 (`R=4, M=4`, 5,380 users).
+   - **Profile**: 6,929 customers, R$ 340.45 avg spend, 70.77 days avg recency, 22.36% repeat buyer share.
+
+2. **Mid Value**:
+   - **Rule**: `(F == 2 AND R <= 2) OR (R >= 3 AND M >= 3)`
+   - **Logic**: Captures all remaining repeat buyers who ordered > 219 days ago (`F=2, R<=2`, 1,252 users) OR recent moderate/high spenders (`R>=3, M>=3`, 16,980 users).
+   - **Profile**: 18,232 customers, R$ 194.65 avg spend, 144.72 days avg recency, 6.87% repeat buyer share.
+
+3. **Dormant** *(Renamed from Lapsing)*:
+   - **Rule**: `(R == 2) OR (R == 1 AND M >= 3)`
+   - **Logic**: Captures aging customers who transacted 220 to 346 days ago (`R=2`) OR oldest customers (347 to 714 days ago) with above-median historical spend (`R=1, M>=3`). All users have `F=1`.
+   - **Naming Rationale**: Named **Dormant** because this is the oldest customer cohort on the platform (average recency **334.80 days**), but they generated substantial lifetime value (**R$ 169.81 avg spend**, R$ 5,686,297.74 total revenue).
+
+4. **Low Spend** *(Renamed from Inactive)*:
+   - **Rule**: `ELSE` (all remaining one-time buyers with low/below-median spend, `M <= 2`).
+   - **Logic**: One-time customers whose primary characteristic is small basket size (avg spend **R$ 46.89**).
+   - **Naming Rationale**: Named **Low Spend** because their defining business constraint is transaction value (R$ 46.89 vs platform average R$ 141.62). They actually bought more recently (average **226.83 days**) than the Dormant group (334.80 days).
+
+#### Why Every Repeat Buyer Falls into Top Value or Mid Value
+
+In this model, **100% of the platform's 2,801 repeat buyers are partitioned between Top Value and Mid Value**:
+- Any customer with $F = 2$ must have a recency score $R \in \{1, 2, 3, 4\}$.
+- If $R \ge 3$ (recency $\le 219$ days), the customer matches Rule 1 (`F == 2 AND R >= 3`) and is assigned to **Top Value** (**1,549 customers**).
+- If $R \le 2$ (recency $> 219$ days), the customer does not match Rule 1, but unconditionally matches Rule 2 (`F == 2 AND R <= 2`) and is assigned to **Mid Value** (**1,252 customers**).
+- Because $\{R \ge 3\} \cup \{R \le 2\}$ constitutes the entire universe of possible recency scores, **every repeat buyer is guaranteed to be assigned before Rules 3 or 4 are reached**. As a result, Dormant and Low Spend have exactly **0 repeat buyers (0.00% repeat share)**.
 
 ### Empirical RFM Segment Distribution
 
@@ -43,14 +81,14 @@ To avoid overstating loyalty given the low repeat rate, segments are named trans
 |:----------|-----------------:|---------------:|-------------------:|-------------------:|--------------------:|--------------:|-------------------:|----------------:|----------------:|
 | Top Value |             6929 |           7.42 |               1549 |              22.36 |        2,358,970.15 |         17.84 |              70.77 |            1.26 |          340.45 |
 | Mid Value |            18232 |          19.53 |               1252 |               6.87 |        3,548,822.05 |         26.84 |             144.72 |            1.07 |          194.65 |
-| Lapsing   |            33487 |          35.87 |                  0 |               0.00 |        5,686,297.74 |         43.01 |             334.80 |            1.00 |          169.81 |
-| Inactive  |            34710 |          37.18 |                  0 |               0.00 |        1,627,408.17 |         12.31 |             226.83 |            1.00 |           46.89 |
+| Dormant   |            33487 |          35.87 |                  0 |               0.00 |        5,686,297.74 |         43.01 |             334.80 |            1.00 |          169.81 |
+| Low Spend |            34710 |          37.18 |                  0 |               0.00 |        1,627,408.17 |         12.31 |             226.83 |            1.00 |           46.89 |
 
 ![RFM Segment Distribution](screenshots/rfm_segments_distribution.png)
 
 > **Business Insight**: **Top Value** customers represent **7.42%** of the customer base (6,929 users) but generate **R$ 2,358,970.15** (17.84% of sales) with an average order value of **R$ 340.45** and the highest repeat buyer share (**22.36%**). Combined, 'Top Value' and 'Mid Value' capture **44.68%** of platform revenue.
 
-> **Actionable Recommendation**: Deploy automated retention triggers for the **33,487 Lapsing customers** before they decay into the **34,710 Inactive segment**.
+> **Actionable Recommendation**: Deploy automated win-back triggers for the **33,487 Dormant customers** before their accounts completely churn, and introduce cross-sell bundles for the **34,710 Low Spend segment** to elevate their average order value.
 
 ---
 
@@ -83,8 +121,8 @@ Tracking monthly acquisition cohorts from January 2017 to December 2017 reveals 
 |:----------|-----------------:|---------------------:|--------------------------:|
 | Top Value |             6929 |               340.45 |                    138.77 |
 | Mid Value |            18232 |               194.65 |                     79.34 |
-| Lapsing   |            33487 |               169.81 |                     69.21 |
-| Inactive  |            34710 |                46.89 |                     19.11 |
+| Dormant   |            33487 |               169.81 |                     69.21 |
+| Low Spend |            34710 |                46.89 |                     19.11 |
 
 > **Business Insight**: Repeat buyers yield an average lifetime value of **R$ 260.05**, representing an incremental **R$ 122.09** (+88.5%) over single-order buyers.
 

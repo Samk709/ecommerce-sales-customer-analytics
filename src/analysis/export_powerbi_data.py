@@ -136,7 +136,7 @@ def export_customers_dimension(engine):
             }
         )
         df = df.merge(rfm_sub, on="customer_unique_id", how="left")
-        df["rfm_segment"] = df["rfm_segment"].fillna("Inactive")
+        df["rfm_segment"] = df["rfm_segment"].fillna("Low Spend")
         df["customer_delivered_orders"] = df["customer_delivered_orders"].fillna(0).astype(int)
         df["customer_delivered_revenue_brl"] = df["customer_delivered_revenue_brl"].fillna(0.0)
         df["is_repeat_customer"] = df["customer_delivered_orders"].apply(lambda f: 1 if f >= 2 else 0)

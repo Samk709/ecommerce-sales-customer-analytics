@@ -94,7 +94,11 @@ def run_rfm_segmentation(engine) -> dict:
     rfm["m_score"] = pd.qcut(rfm["monetary"], 4, labels=[1, 2, 3, 4]).astype(int) # 4 = highest spend
     rfm["f_score"] = rfm["frequency"].apply(lambda x: 2 if x >= 2 else 1)
 
-    # Renamed segments reflecting spend and recency without overstating loyalty
+    # Renamed segments reflecting spend and recency without overstating loyalty:
+    # Top Value: Recent top spenders or active repeat buyers
+    # Mid Value: Recent moderate spenders or remaining repeat buyers
+    # Dormant: Oldest cohort of customers (avg recency 334.80 days) with moderate spend (avg R$ 169.81)
+    # Low Spend: Customers defined by low basket size (avg spend R$ 46.89, avg recency 226.83 days)
     def assign_segment(row):
         r, f, m = row["r_score"], row["f_score"], row["m_score"]
         # Top Value: Repeat buyers with recent activity OR recent top-quartile spenders
@@ -103,12 +107,12 @@ def run_rfm_segmentation(engine) -> dict:
         # Mid Value: Remaining repeat buyers OR recent moderate-to-high spenders
         elif (f == 2 and r <= 2) or (r >= 3 and m >= 3):
             return "Mid Value"
-        # Lapsing: Previously moderate/high spenders who lapsed
+        # Dormant: Oldest cohort of customers with moderate-to-high spend (avg recency 334.80 days)
         elif (r == 2) or (r == 1 and m >= 3):
-            return "Lapsing"
-        # Inactive: Oldest, low-spending one-time purchasers
+            return "Dormant"
+        # Low Spend: Customers defined by low basket size (avg spend R$ 46.89, avg recency 226.83 days)
         else:
-            return "Inactive"
+            return "Low Spend"
 
     rfm["segment"] = rfm.apply(assign_segment, axis=1)
 
@@ -129,7 +133,7 @@ def run_rfm_segmentation(engine) -> dict:
     summary["revenue_pct"] = (summary["total_revenue_brl"] / total_rev) * 100
 
     # Ensure consistent order by revenue
-    segment_order = ["Top Value", "Mid Value", "Lapsing", "Inactive"]
+    segment_order = ["Top Value", "Mid Value", "Dormant", "Low Spend"]
     summary["sort_order"] = summary["segment"].apply(lambda x: segment_order.index(x) if x in segment_order else 99)
     summary = summary.sort_values(by="sort_order").drop(columns=["sort_order"]).reset_index(drop=True)
 
@@ -145,7 +149,7 @@ def run_rfm_segmentation(engine) -> dict:
 
     # Visualization
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    palette = {"Top Value": "#2ecc71", "Mid Value": "#3498db", "Lapsing": "#e67e22", "Inactive": "#e74c3c"}
+    palette = {"Top Value": "#2ecc71", "Mid Value": "#3498db", "Dormant": "#e67e22", "Low Spend": "#e74c3c"}
     
     sns.barplot(data=summary, x="segment", y="customer_count", hue="segment", palette=palette, legend=False, ax=axes[0])
     axes[0].set_title("Customer Volume by RFM Value Segment")
@@ -722,15 +726,46 @@ def generate_eda_markdown(rfm_res, cohort_res, clv_res, pareto_res, csat_res, pr
     # Section 1: RFM
     md.append("## 1. RFM Customer Segmentation\n\n")
     md.append("### Methodology & One-Time Buyer Handling\n")
-    md.append("In the Olist dataset, **97.00% of customers purchase exactly once** (`frequency = 1`). Specifically, only **2,801 out of 93,358 customers (3.00%)** are repeat buyers. Standard quintile or quantile binning on Frequency fails mathematically because all frequency quantile cutoffs from the 20th to 80th percentiles collapse to 1. To resolve this robustly, we apply a **hybrid discrete-quantile scoring model**:\n")
-    md.append("- **Recency ($R$)**: Segmented into quartiles (1 to 4, where 4 is most recent).\n")
-    md.append("- **Monetary ($M$)**: Segmented into quartiles (1 to 4, where 4 is highest total spend).\n")
-    md.append("- **Frequency ($F$)**: Categorized discretely as Repeat Buyer ($F \\ge 2 \\rightarrow F\\_score = 2$) vs Single Buyer ($F = 1 \\rightarrow F\\_score = 1$).\n\n")
-    md.append("To avoid overstating loyalty given the low repeat rate, segments are named transparently based on recency and monetary value:\n")
-    md.append("1. **Top Value**: Repeat buyers with recent activity ($F=2, R \\ge 3$) OR top-quartile spenders who bought recently ($R=4, M=4$). High spenders with 22.36% repeat share.\n")
-    md.append("2. **Mid Value**: Remaining repeat buyers ($F=2, R \\le 2$) OR recent moderate-to-high spenders ($R \\ge 3, M \\ge 3$). Contains 6.87% repeat buyers.\n")
-    md.append("3. **Lapsing**: Previously moderate/high spenders who have not purchased recently ($R=2$ or $R=1, M \\ge 3$). 0.00% repeat buyers.\n")
-    md.append("4. **Inactive**: Oldest, low-spending one-time purchasers ($R=1, M \\le 2$). 0.00% repeat buyers.\n\n")
+    md.append("In the Olist dataset, **97.00% of customers purchase exactly once** (`frequency = 1`). Specifically, only **2,801 out of 93,358 customers (3.00%)** are repeat buyers. Standard quintile or quantile binning on Frequency fails mathematically because all frequency quantile cutoffs from the 20th to 80th percentiles collapse to 1. To resolve this robustly, we apply a **hybrid discrete-quantile scoring model**:\n\n")
+    md.append("#### Exact Quartile Thresholds & Dimension Scoring\n\n")
+    md.append("| Dimension | Score | Quartile / Category | Exact Cutoff Range | Business Meaning |\n")
+    md.append("|:---|:---:|:---|:---|:---|\n")
+    md.append("| **Recency ($R$)** | **4** | Quartile 1 (Top 25%) | 1 to 114 days | Most recent purchases |\n")
+    md.append("| | **3** | Quartile 2 | 115 to 219 days | Moderately recent purchases |\n")
+    md.append("| | **2** | Quartile 3 | 220 to 346 days | Lapsing / aging purchases |\n")
+    md.append("| | **1** | Quartile 4 (Bottom 25%) | 347 to 714 days | Oldest historical purchases |\n")
+    md.append("| **Monetary ($M$)** | **4** | Quartile 4 (Top 25%) | R$ 154.75 to R$ 13,440.00 | High spenders |\n")
+    md.append("| | **3** | Quartile 3 | R$ 89.74 to R$ 154.74 | Upper-moderate spenders |\n")
+    md.append("| | **2** | Quartile 2 | R$ 47.66 to R$ 89.73 | Lower-moderate spenders |\n")
+    md.append("| | **1** | Quartile 1 (Bottom 25%) | R$ 0.85 to R$ 47.65 | Low spenders |\n")
+    md.append("| **Frequency ($F$)** | **2** | Repeat Buyer | $\\ge 2$ delivered orders | Multi-order customer (2,801 users = 3.00%) |\n")
+    md.append("| | **1** | Single Buyer | 1 delivered order | One-time buyer (90,557 users = 97.00%) |\n\n")
+
+    md.append("#### Exact Segment Assignment Rules & Logic\n\n")
+    md.append("Segments are assigned using the following mutually exclusive rules evaluated in order:\n\n")
+    md.append("1. **Top Value**:\n")
+    md.append("   - **Rule**: `(F == 2 AND R >= 3) OR (R == 4 AND M == 4)`\n")
+    md.append("   - **Logic**: Captures active repeat buyers who ordered within 219 days (`F=2, R>=3`, 1,549 users) OR single-order buyers who transacted within 114 days and spent $\\ge$ R$ 154.75 (`R=4, M=4`, 5,380 users).\n")
+    md.append("   - **Profile**: 6,929 customers, R$ 340.45 avg spend, 70.77 days avg recency, 22.36% repeat buyer share.\n\n")
+    md.append("2. **Mid Value**:\n")
+    md.append("   - **Rule**: `(F == 2 AND R <= 2) OR (R >= 3 AND M >= 3)`\n")
+    md.append("   - **Logic**: Captures all remaining repeat buyers who ordered > 219 days ago (`F=2, R<=2`, 1,252 users) OR recent moderate/high spenders (`R>=3, M>=3`, 16,980 users).\n")
+    md.append("   - **Profile**: 18,232 customers, R$ 194.65 avg spend, 144.72 days avg recency, 6.87% repeat buyer share.\n\n")
+    md.append("3. **Dormant** *(Renamed from Lapsing)*:\n")
+    md.append("   - **Rule**: `(R == 2) OR (R == 1 AND M >= 3)`\n")
+    md.append("   - **Logic**: Captures aging customers who transacted 220 to 346 days ago (`R=2`) OR oldest customers (347 to 714 days ago) with above-median historical spend (`R=1, M>=3`). All users have `F=1`.\n")
+    md.append("   - **Naming Rationale**: Named **Dormant** because this is the oldest customer cohort on the platform (average recency **334.80 days**), but they generated substantial lifetime value (**R$ 169.81 avg spend**, R$ 5,686,297.74 total revenue).\n\n")
+    md.append("4. **Low Spend** *(Renamed from Inactive)*:\n")
+    md.append("   - **Rule**: `ELSE` (all remaining one-time buyers with low/below-median spend, `M <= 2`).\n")
+    md.append("   - **Logic**: One-time customers whose primary characteristic is small basket size (avg spend **R$ 46.89**).\n")
+    md.append("   - **Naming Rationale**: Named **Low Spend** because their defining business constraint is transaction value (R$ 46.89 vs platform average R$ 141.62). They actually bought more recently (average **226.83 days**) than the Dormant group (334.80 days).\n\n")
+
+    md.append("#### Why Every Repeat Buyer Falls into Top Value or Mid Value\n\n")
+    md.append("In this model, **100% of the platform's 2,801 repeat buyers are partitioned between Top Value and Mid Value**:\n")
+    md.append("- Any customer with $F = 2$ must have a recency score $R \\in \\{1, 2, 3, 4\\}$.\n")
+    md.append("- If $R \\ge 3$ (recency $\\le 219$ days), the customer matches Rule 1 (`F == 2 AND R >= 3`) and is assigned to **Top Value** (**1,549 customers**).\n")
+    md.append("- If $R \\le 2$ (recency $> 219$ days), the customer does not match Rule 1, but unconditionally matches Rule 2 (`F == 2 AND R <= 2`) and is assigned to **Mid Value** (**1,252 customers**).\n")
+    md.append("- Because $\\{R \\ge 3\\} \\cup \\{R \\le 2\\}$ constitutes the entire universe of possible recency scores, **every repeat buyer is guaranteed to be assigned before Rules 3 or 4 are reached**. As a result, Dormant and Low Spend have exactly **0 repeat buyers (0.00% repeat share)**.\n\n")
 
     md.append("### Empirical RFM Segment Distribution\n\n")
     md.append(rfm_sum.to_markdown(index=False, floatfmt=",.2f"))
@@ -739,11 +774,11 @@ def generate_eda_markdown(rfm_res, cohort_res, clv_res, pareto_res, csat_res, pr
 
     top_row = rfm_sum[rfm_sum["segment"] == "Top Value"].iloc[0]
     mid_row = rfm_sum[rfm_sum["segment"] == "Mid Value"].iloc[0]
-    lapsing_row = rfm_sum[rfm_sum["segment"] == "Lapsing"].iloc[0]
-    inactive_row = rfm_sum[rfm_sum["segment"] == "Inactive"].iloc[0]
+    dormant_row = rfm_sum[rfm_sum["segment"] == "Dormant"].iloc[0]
+    lowspend_row = rfm_sum[rfm_sum["segment"] == "Low Spend"].iloc[0]
 
     md.append(f"> **Business Insight**: **Top Value** customers represent **{top_row['customer_pct']:.2f}%** of the customer base ({int(top_row['customer_count']):,} users) but generate **R$ {top_row['total_revenue_brl']:,.2f}** ({top_row['revenue_pct']:.2f}% of sales) with an average order value of **R$ {top_row['avg_spend_brl']:.2f}** and the highest repeat buyer share (**{top_row['repeat_buyer_pct']:.2f}%**). Combined, 'Top Value' and 'Mid Value' capture **{top_row['revenue_pct'] + mid_row['revenue_pct']:.2f}%** of platform revenue.\n\n")
-    md.append(f"> **Actionable Recommendation**: Deploy automated retention triggers for the **{int(lapsing_row['customer_count']):,} Lapsing customers** before they decay into the **{int(inactive_row['customer_count']):,} Inactive segment**.\n\n")
+    md.append(f"> **Actionable Recommendation**: Deploy automated win-back triggers for the **{int(dormant_row['customer_count']):,} Dormant customers** before their accounts completely churn, and introduce cross-sell bundles for the **{int(lowspend_row['customer_count']):,} Low Spend segment** to elevate their average order value.\n\n")
     md.append("---\n\n")
 
     # Section 2: Cohort Retention

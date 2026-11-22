@@ -105,4 +105,4 @@ def test_powerbi_customer_repeat_and_rfm_enrichment():
 
     # RFM Segment integrity
     rfm_segments = set(cust_df["rfm_segment"].unique())
-    assert {"Top Value", "Mid Value", "Lapsing", "Inactive"}.issubset(rfm_segments)
+    assert {"Top Value", "Mid Value", "Dormant", "Low Spend"}.issubset(rfm_segments)

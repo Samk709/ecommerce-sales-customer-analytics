@@ -28,7 +28,7 @@ def test_rfm_customer_count_and_revenue_integrity():
     assert summary["repeat_customers"].sum() == 2801
     assert abs(summary["total_revenue_brl"].sum() - 13221498.11) <= 0.05
     
-    expected_segments = {"Top Value", "Mid Value", "Lapsing", "Inactive"}
+    expected_segments = {"Top Value", "Mid Value", "Dormant", "Low Spend"}
     assert set(summary["segment"]) == expected_segments
     
     # Verify repeat buyer share calculations

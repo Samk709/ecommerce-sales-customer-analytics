@@ -21,8 +21,8 @@ The **E-Commerce Sales & Customer Intelligence Dashboard** is designed for C-sui
 | **Primary Theme** | Dark Slate Navy | `#1B2A4A` | Header banners, KPI card labels, primary series |
 | **Secondary Accent** | Ocean Blue | `#2980B9` | Historical revenue bars, secondary chart elements |
 | **Accent Positive** | Emerald Green | `#27AE60` | On-time delivery, gross profit, promoter scores, top value |
-| **Accent Warning** | Ochre Amber | `#F39C12` | Moderate delays, lapsing customers, mid-tier margin |
-| **Accent Negative** | Crimson Coral | `#E74C3C` | SLA breaches, cancellations, detractors, inactive customers |
+| **Accent Warning** | Ochre Amber | `#F39C12` | Moderate delays, dormant customers, mid-tier margin |
+| **Accent Negative** | Crimson Coral | `#E74C3C` | SLA breaches, cancellations, detractors, low-spend customers |
 | **Canvas Background**| Crisp Off-White | `#F8F9FA` | Report background behind visual cards |
 | **Visual Container** | Pure White | `#FFFFFF` | Visual card background with 1px border (`#E2E8F0`) & soft shadow |
 
@@ -95,7 +95,7 @@ The **E-Commerce Sales & Customer Intelligence Dashboard** is designed for C-sui
 #### Main Charts Area ($Y = 200 \text{ to } 690\text{ px}$)
 - **Visual 2.6: RFM Segment Customer Volume vs Revenue Share** ($X=20, Y=200, W=600, H=310$)
   - **Type**: Clustered Column Chart.
-  - **X-Axis**: `dim_customers[rfm_segment]` (Order: `Top Value`, `Mid Value`, `Lapsing`, `Inactive`).
+  - **X-Axis**: `dim_customers[rfm_segment]` (Order: `Top Value`, `Mid Value`, `Dormant`, `Low Spend`).
   - **Y-Axis**: `[Total Unique Customers]` and `[Total Delivered Merchandise Revenue]`.
   - **Insight Note**: Shows that Top Value + Mid Value hold >44% of revenue despite low total buyer share.
 - **Visual 2.7: RFM Customer Profile Matrix** ($X=640, Y=200, W=620, H=310$)

@@ -45,7 +45,7 @@ erDiagram
         int customer_zip_code_prefix "5-digit zip prefix"
         varchar customer_city "Customer City"
         varchar customer_state "2-letter state code"
-        varchar rfm_segment "Top Value, Mid Value, Lapsing, Inactive"
+        varchar rfm_segment "Top Value, Mid Value, Dormant, Low Spend"
         int is_repeat_customer "Flag (1=Repeat buyer >=2 orders, 0=Single)"
         int customer_delivered_orders "Total historical delivered orders"
         decimal customer_delivered_revenue_brl "Total lifetime spend (R$)"
