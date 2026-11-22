@@ -1,0 +1,54 @@
+# Streamlit E-Commerce Executive Intelligence App
+
+## 1. Overview
+The **Streamlit E-Commerce Executive Intelligence Application** is a decoupled, cloud-ready BI and analytical web application built on top of the **Olist Brazilian E-Commerce Ecosystem** (~100k orders, 2016–2018).
+
+### Architectural Highlights
+- **Zero-Database Dependency**: Reads directly from pre-aggregated, sanitized CSV files in `data/exports/`. The app does not require a running MySQL instance, allowing free deployment on **Streamlit Community Cloud**, Render, or Hugging Face Spaces.
+- **In-Memory Caching**: Utilizes `@st.cache_data` in `streamlit_app/data_loader.py` to ensure instant sub-second page switches and re-filtering.
+- **Pure-Python Analytical Engine**: Decoupled KPI calculation logic in `streamlit_app/kpi_metrics.py` verified with automated pytest tests.
+- **Currency & Business Standards**: All monetary values are strictly in **Brazilian Reais (R$ / BRL)**. Revenue filters for completed transactions (`order_status = 'delivered'`) and excludes shipping freight. All financial margins are labelled *"assumed margin, not real data"*. RFM customer segmentation uses the data-accurate labels: `Top Value`, `Mid Value`, `Dormant`, and `Low Spend`.
+
+---
+
+## 2. Page Directory & Capabilities
+
+| Page | Description | Core Features & Visuals |
+|:---|:---|:---|
+| **🏠 Executive Overview** | High-level business performance | 6 Headline KPI cards (Revenue R$ 13.22M, GMV R$ 15.42M, 96,478 Orders, AOV R$ 137.04, Assumed GP R$ 5.39M, 2,801 Repeat Buyers). Monthly revenue + MoM growth chart, top 10 states bar chart, monthly aggregation table with CSV download. |
+| **📦 Products & Categories** | Merchandise and sector profitability | Macro category profitability (Revenue vs Assumed GP grouped bar chart), 80/20 Pareto distribution curve (top 25.93% SKUs drive 80% revenue), Top 20 best-selling SKUs table with CSV export. |
+| **👥 Customers & Retention** | Customer acquisition, RFM, cohorts | RFM value segment volume vs revenue dual-axis chart, repeat vs one-time buyer donut chart, 2017 monthly cohort retention heatmap (rendering 0.00% for observed zero periods), segment profile table. |
+| **🚚 Logistics SLA & CSAT** | Delivery SLA & review rating impact | On-time delivery rate (93.23%), lead time metrics, on-time (4.29 stars) vs late (2.27 stars) CSAT penalty comparison (-2.02 star drop), 5 delay tiers bar chart, OLS linear regression decay trendline on late orders (-0.0160 stars/day). |
+| **📈 Sales Forecast** | Time-series forecasting | 30-day additive Holt-Winters forecast capturing 7-day weekly cyclicality, validation against 30-day holdout (12.90% WAPE, R$ 4,647.90 MAE), forward 30-day projection, daily forecast table. |
+
+---
+
+## 3. Quickstart & Execution Guide
+
+### Windows 11 (PowerShell)
+```powershell
+# 1. Navigate to the project root
+cd "c:\Users\khana\Desktop\DAP 1"
+
+# 2. Activate virtual environment
+.\venv\Scripts\Activate.ps1
+
+# 3. Ensure dependencies are installed
+pip install -r requirements.txt
+
+# 4. Launch the Streamlit application
+streamlit run streamlit_app/app.py
+```
+
+The application will automatically open in your default browser at:
+`http://localhost:8501`
+
+### Running KPI Automated Tests
+To verify that the standalone KPI calculation engine reproduces the exact baseline figures:
+```powershell
+pytest -v tests/test_streamlit_kpis.py
+```
+Expected output:
+- `total_revenue_brl`: **R$ 13,221,498.11**
+- `total_delivered_orders`: **96,478**
+- `repeat_customers_count`: **2,801**
