@@ -1,0 +1,164 @@
+# ==============================================================================
+# FINANCIAL ASSUMPTIONS - COGS & GROSS MARGIN BENCHMARKS (BRL / R$)
+# ==============================================================================
+# DISCLAIMER: ASSUMPTION, NOT REAL DATA.
+# The public Olist Brazilian E-Commerce dataset does not provide item-level cost
+# or COGS (Cost of Goods Sold). All financial values (price, freight, payments)
+# in Olist are natively in Brazilian Reais (R$ / BRL).
+#
+# To enable unit economics, gross profit, and profitability analytics in BRL (R$),
+# the 70+ product categories are mapped into 11 macro sectors with realistic
+# industry benchmark margins (derived from retail and marketplace e-commerce standards).
+#
+# Market Commission / Take Rate: 10% marketplace revenue fee
+# Currency: Brazilian Reais (R$ / BRL)
+# ==============================================================================
+
+metadata:
+  model_name: "E-Commerce Category Profitability Benchmark Model"
+  version: "1.1"
+  status: "ASSUMPTION - NOT REAL DATA"
+  currency: "BRL"
+  currency_symbol: "R$"
+  default_marketplace_commission_rate: 0.10  # 10% platform take-rate
+
+category_groups:
+  Computers & Electronics:
+    cogs_rate: 0.75          # 75% COGS
+    gross_margin_rate: 0.25  # 25% Gross Margin
+    description: "High-ticket hardware, consumer electronics, and computing gear."
+    categories:
+      - computers
+      - computers_accessories
+      - pc_gamer
+      - electronics
+      - tablets_printing_image
+      - telephony
+      - fixed_telephony
+      - audio
+      - cine_photo
+      - consoles_games
+
+  Home Appliances:
+    cogs_rate: 0.65
+    gross_margin_rate: 0.35
+    description: "Major and small domestic appliances and climate control."
+    categories:
+      - home_appliances
+      - home_appliances_2
+      - small_appliances
+      - small_appliances_home_oven_and_coffee
+      - air_conditioning
+      - kitchen_and_food_preparers_portable
+      - la_cuisine
+
+  Furniture & Home Decor:
+    cogs_rate: 0.60
+    gross_margin_rate: 0.40
+    description: "Interior design, living room furniture, bedding, and home improvement."
+    categories:
+      - bed_bath_table
+      - furniture_decor
+      - furniture_living_room
+      - furniture_bedroom
+      - furniture_mattress_and_upholstery
+      - office_furniture
+      - kitchen_dining_laundry_garden_furniture
+      - home_comfort_2
+      - home_confort
+      - housewares
+
+  Fashion & Apparel:
+    cogs_rate: 0.45
+    gross_margin_rate: 0.55
+    description: "Apparel, footwear, bags, watches, and luxury accessories."
+    categories:
+      - fashio_female_clothing
+      - fashion_male_clothing
+      - fashion_childrens_clothes
+      - fashion_shoes
+      - fashion_bags_accessories
+      - fashion_underwear_beach
+      - fashion_sport
+      - luggage_accessories
+      - watches_gifts
+
+  Beauty & Personal Care:
+    cogs_rate: 0.50
+    gross_margin_rate: 0.50
+    description: "Cosmetics, perfumes, hygiene, and wellness products."
+    categories:
+      - health_beauty
+      - perfumery
+      - diapers_and_hygiene
+
+  Sports, Toys & Hobbies:
+    cogs_rate: 0.55
+    gross_margin_rate: 0.45
+    description: "Recreation gear, toys, baby care, musical instruments, and crafts."
+    categories:
+      - sports_leisure
+      - toys
+      - baby
+      - musical_instruments
+      - music
+      - party_supplies
+      - christmas_supplies
+      - art
+      - arts_and_craftmanship
+
+  Books & Media:
+    cogs_rate: 0.55
+    gross_margin_rate: 0.45
+    description: "Print books, stationary, CDs, DVDs, and media items."
+    categories:
+      - books_general_interest
+      - books_technical
+      - books_imported
+      - stationery
+      - cds_dvds_musicals
+      - dvds_blu_ray
+
+  Automotive & Parts:
+    cogs_rate: 0.70
+    gross_margin_rate: 0.30
+    description: "Automobile replacement parts and vehicle maintenance equipment."
+    categories:
+      - auto
+
+  Tools & Construction:
+    cogs_rate: 0.65
+    gross_margin_rate: 0.35
+    description: "Hardware, safety equipment, tools, and industrial maintenance."
+    categories:
+      - garden_tools
+      - costruction_tools_garden
+      - costruction_tools_tools
+      - construction_tools_construction
+      - construction_tools_lights
+      - construction_tools_safety
+      - home_construction
+
+  Food, Drinks & Flowers:
+    cogs_rate: 0.70
+    gross_margin_rate: 0.30
+    description: "Packaged foods, beverages, gourmet goods, and fresh flowers."
+    categories:
+      - food
+      - food_drink
+      - drinks
+      - flowers
+
+  Commercial & General:
+    cogs_rate: 0.60
+    gross_margin_rate: 0.40
+    description: "Pet supplies, agro-business, safety, unclassified, and other goods."
+    categories:
+      - industry_commerce_and_business
+      - agro_industry_and_commerce
+      - signaling_and_security
+      - security_and_services
+      - market_place
+      - cool_stuff
+      - pet_shop
+      - unknown
