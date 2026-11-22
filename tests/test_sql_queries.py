@@ -256,3 +256,100 @@ def test_sla_tier_order_counts_reconciliation(db_conn):
     assert expected_orders == 96470
     assert total_tier_orders == 96470
 
+def test_q14_profitability_group_sums_and_totals(db_conn):
+    """
+    Verify that summing across all 11 category groups in Query 14:
+    1. Sum of estimated COGS equals R$ 7,832,679.15
+    2. Sum of gross profit equals R$ 5,388,818.98
+    3. Sum of group COGS + GP equals platform item revenue (R$ 13,221,498.11) within 0.05
+    4. Overall blended margin is 40.76% (within 0.05%)
+    """
+    sql = text("""
+        WITH category_profits AS (
+            SELECT 
+                p.category_group,
+                SUM(i.price) AS revenue_brl,
+                SUM(i.price * p.assumed_cogs_rate) AS estimated_cogs_brl,
+                SUM(i.price * p.assumed_gross_margin_rate) AS estimated_gross_profit_brl
+            FROM fact_order_items i
+            JOIN dim_orders o ON i.order_id = o.order_id
+            JOIN dim_products p ON i.product_id = p.product_id
+            WHERE o.order_status = 'delivered'
+            GROUP BY p.category_group
+        )
+        SELECT 
+            ROUND(SUM(ROUND(estimated_cogs_brl, 2)), 2) AS sum_cogs,
+            ROUND(SUM(ROUND(estimated_gross_profit_brl, 2)), 2) AS sum_gross_profit,
+            ROUND(SUM(ROUND(revenue_brl, 2)), 2) AS sum_revenue
+        FROM category_profits;
+    """)
+    row = db_conn.execute(sql).fetchone()
+    sum_cogs = float(row[0])
+    sum_gp = float(row[1])
+    sum_rev = float(row[2])
+
+    assert sum_cogs == 7832679.15
+    assert sum_gp == 5388818.98
+    assert abs((sum_cogs + sum_gp) - sum_rev) <= 0.05
+    assert sum_rev == 13221498.11
+    blended_margin = round(sum_gp * 100.0 / sum_rev, 2)
+    assert blended_margin == 40.76
+
+def test_q5_csat_review_counts_and_shares_sum(db_conn):
+    """
+    Verify that in Query 5 (CSAT Rating Distribution):
+    1. Total reviews across all star ratings sum to exactly 96,361.
+    2. Review share percentages sum to 100.00% (within 0.05%).
+    """
+    sql = text("""
+        WITH review_dist AS (
+            SELECT 
+                r.review_score,
+                COUNT(r.review_surrogate_id) AS total_reviews,
+                ROUND(COUNT(r.review_surrogate_id) * 100.0 / SUM(COUNT(r.review_surrogate_id)) OVER(), 2) AS percentage_of_reviews
+            FROM fact_order_reviews r
+            JOIN dim_orders o ON r.order_id = o.order_id
+            WHERE o.order_status = 'delivered'
+            GROUP BY r.review_score
+        )
+        SELECT 
+            SUM(total_reviews) AS sum_reviews,
+            ROUND(SUM(percentage_of_reviews), 2) AS sum_shares
+        FROM review_dist;
+    """)
+    row = db_conn.execute(sql).fetchone()
+    sum_reviews = int(row[0])
+    sum_shares = float(row[1])
+
+    assert sum_reviews == 96361
+    assert abs(sum_shares - 100.00) <= 0.05
+
+def test_q8_standardized_date_late_definition(db_conn):
+    """
+    Verify Query 8 with standardized date comparison DATE(delivered) <= DATE(estimated):
+    1. On-Time / Early review count is 89,944
+    2. Delayed / Late review count is 6,409
+    3. Total reviews evaluated equals 96,353
+    """
+    sql = text("""
+        SELECT 
+            CASE 
+                WHEN DATE(o.order_delivered_customer_date) <= DATE(o.order_estimated_delivery_date) THEN 'On-Time / Early'
+                ELSE 'Delayed / Late'
+            END AS delivery_performance,
+            COUNT(r.review_surrogate_id) AS review_count
+        FROM dim_orders o
+        JOIN fact_order_reviews r ON o.order_id = r.order_id
+        WHERE o.order_status = 'delivered' 
+          AND o.order_delivered_customer_date IS NOT NULL
+        GROUP BY delivery_performance;
+    """)
+    rows = dict(db_conn.execute(sql).fetchall())
+    ontime_count = rows["On-Time / Early"]
+    delayed_count = rows["Delayed / Late"]
+
+    assert ontime_count == 89944
+    assert delayed_count == 6409
+    assert ontime_count + delayed_count == 96353
+
+

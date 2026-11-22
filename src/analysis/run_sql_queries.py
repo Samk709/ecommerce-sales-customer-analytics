@@ -162,11 +162,11 @@ LIMIT 10;"""
         "tier": 2,
         "title": "Delivery Delay Impact on Customer Satisfaction (CSAT)",
         "question": "How severely does late delivery past the promised estimated date degrade customer satisfaction ratings and inflate 1-star reviews?",
-        "filter_note": "Includes only completed orders (order_status = 'delivered') with non-null customer delivery timestamps.",
-        "explanation": "Logistics performance is the primary driver of e-commerce customer retention. This query benchmarks on-time deliveries against delayed orders across average rating and promoter/detractor splits.",
+        "filter_note": "Includes only completed orders (order_status = 'delivered') with non-null customer delivery timestamps. Uses calendar date comparison (DATE(delivered) <= DATE(estimated)) to avoid time-of-day bias against estimated dates lacking timestamps.",
+        "explanation": "Logistics performance is the primary driver of e-commerce customer retention. This query benchmarks on-time deliveries against delayed orders across average rating and promoter/detractor splits using standardized calendar date boundaries.",
         "sql": """SELECT 
     CASE 
-        WHEN o.order_delivered_customer_date <= o.order_estimated_delivery_date THEN 'On-Time / Early'
+        WHEN DATE(o.order_delivered_customer_date) <= DATE(o.order_estimated_delivery_date) THEN 'On-Time / Early'
         ELSE 'Delayed / Late'
     END AS delivery_performance,
     COUNT(r.review_surrogate_id) AS review_count,

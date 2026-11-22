@@ -24,7 +24,7 @@ JOIN fact_order_items i ON o.order_id = i.order_id
 WHERE o.order_status = 'delivered';
 ```
 
-**Execution Performance**: `1936.33 ms`
+**Execution Performance**: `2026.9 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
@@ -53,7 +53,7 @@ JOIN fact_order_items i ON o.order_id = i.order_id
 WHERE o.order_status = 'delivered';
 ```
 
-**Execution Performance**: `2615.38 ms`
+**Execution Performance**: `2629.92 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
@@ -82,7 +82,7 @@ GROUP BY order_status
 ORDER BY order_count DESC;
 ```
 
-**Execution Performance**: `175.28 ms`
+**Execution Performance**: `207.25 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
@@ -123,7 +123,7 @@ GROUP BY p.payment_type
 ORDER BY total_payment_value_brl DESC;
 ```
 
-**Execution Performance**: `1419.91 ms`
+**Execution Performance**: `1855.51 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
@@ -157,7 +157,7 @@ GROUP BY r.review_score
 ORDER BY r.review_score DESC;
 ```
 
-**Execution Performance**: `2445.94 ms`
+**Execution Performance**: `1791.51 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
@@ -203,7 +203,7 @@ ORDER BY item_revenue_brl DESC
 LIMIT 10;
 ```
 
-**Execution Performance**: `4131.09 ms`
+**Execution Performance**: `4952.71 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
@@ -248,7 +248,7 @@ ORDER BY total_item_revenue_brl DESC
 LIMIT 10;
 ```
 
-**Execution Performance**: `4089.84 ms`
+**Execution Performance**: `4444.15 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
@@ -272,14 +272,14 @@ LIMIT 10;
 ### Query 8: Delivery Delay Impact on Customer Satisfaction (CSAT)
 **Business Question**: *How severely does late delivery past the promised estimated date degrade customer satisfaction ratings and inflate 1-star reviews?*
 
-**Revenue Filter Specification**: Includes only completed orders (order_status = 'delivered') with non-null customer delivery timestamps.
+**Revenue Filter Specification**: Includes only completed orders (order_status = 'delivered') with non-null customer delivery timestamps. Uses calendar date comparison (DATE(delivered) <= DATE(estimated)) to avoid time-of-day bias against estimated dates lacking timestamps.
 
-**Analytical Explanation**: Logistics performance is the primary driver of e-commerce customer retention. This query benchmarks on-time deliveries against delayed orders across average rating and promoter/detractor splits.
+**Analytical Explanation**: Logistics performance is the primary driver of e-commerce customer retention. This query benchmarks on-time deliveries against delayed orders across average rating and promoter/detractor splits using standardized calendar date boundaries.
 
 ```sql
 SELECT 
     CASE 
-        WHEN o.order_delivered_customer_date <= o.order_estimated_delivery_date THEN 'On-Time / Early'
+        WHEN DATE(o.order_delivered_customer_date) <= DATE(o.order_estimated_delivery_date) THEN 'On-Time / Early'
         ELSE 'Delayed / Late'
     END AS delivery_performance,
     COUNT(r.review_surrogate_id) AS review_count,
@@ -293,16 +293,16 @@ WHERE o.order_status = 'delivered'
 GROUP BY delivery_performance;
 ```
 
-**Execution Performance**: `2371.42 ms`
+**Execution Performance**: `2617.88 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
 | delivery_performance   |   review_count |   avg_review_score |   detractor_pct_1_2_star |   promoter_pct_5_star |
 |:-----------------------|---------------:|-------------------:|-------------------------:|----------------------:|
-| On-Time / Early        |          88653 |               4.29 |                     9.23 |                 62.43 |
-| Delayed / Late         |           7700 |               2.57 |                    54.03 |                 22.22 |
+| On-Time / Early        |          89944 |               4.29 |                     9.28 |                 62.26 |
+| Delayed / Late         |           6409 |               2.27 |                    62.41 |                 16.54 |
 
-> **Business Insight**: Late delivery is catastrophic for customer experience: CSAT plummets by 1.72 points (from 4.29 to 2.57), with 54.03% of late recipients issuing 1-2 star reviews.
+> **Business Insight**: Late delivery is catastrophic for customer experience: CSAT plummets by 2.02 points (from 4.29 to 2.27), with 62.41% of late recipients issuing 1-2 star reviews.
 
 ---
 
@@ -329,7 +329,7 @@ GROUP BY p.category_group
 ORDER BY freight_to_price_ratio_pct DESC;
 ```
 
-**Execution Performance**: `2981.73 ms`
+**Execution Performance**: `3106.24 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
@@ -376,7 +376,7 @@ ORDER BY total_item_revenue_brl DESC
 LIMIT 10;
 ```
 
-**Execution Performance**: `4603.91 ms`
+**Execution Performance**: `4790.89 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
@@ -437,7 +437,7 @@ FROM customer_segments
 GROUP BY customer_type;
 ```
 
-**Execution Performance**: `4662.52 ms`
+**Execution Performance**: `4996.65 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
@@ -483,7 +483,7 @@ GROUP BY basket_size_tier
 ORDER BY order_count DESC;
 ```
 
-**Execution Performance**: `3737.63 ms`
+**Execution Performance**: `4424.04 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
@@ -529,7 +529,7 @@ GROUP BY sla_performance_tier
 ORDER BY order_count DESC;
 ```
 
-**Execution Performance**: `1151.37 ms`
+**Execution Performance**: `1285.96 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
@@ -574,7 +574,7 @@ FROM category_profits
 ORDER BY gross_profit_brl DESC;
 ```
 
-**Execution Performance**: `2926.63 ms`
+**Execution Performance**: `3346.12 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
@@ -631,7 +631,7 @@ FROM ranked_customers
 GROUP BY customer_tier;
 ```
 
-**Execution Performance**: `5515.6 ms`
+**Execution Performance**: `5977.18 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
@@ -685,7 +685,7 @@ FROM seller_cumulative
 GROUP BY seller_segment;
 ```
 
-**Execution Performance**: `2410.69 ms`
+**Execution Performance**: `2807.79 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
@@ -731,7 +731,7 @@ FROM monthly_sales
 ORDER BY order_month;
 ```
 
-**Execution Performance**: `2151.23 ms`
+**Execution Performance**: `2728.65 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
@@ -789,7 +789,7 @@ FROM monthly_revenue
 ORDER BY purchase_month;
 ```
 
-**Execution Performance**: `2332.83 ms`
+**Execution Performance**: `2742.7 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
@@ -860,7 +860,7 @@ WHERE category_rank <= 3
 ORDER BY category_group, category_rank;
 ```
 
-**Execution Performance**: `2713.33 ms`
+**Execution Performance**: `2927.46 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
@@ -938,7 +938,7 @@ SELECT
 FROM order_intervals;
 ```
 
-**Execution Performance**: `4691.36 ms`
+**Execution Performance**: `5057.43 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
@@ -987,7 +987,7 @@ GROUP BY spend_decile
 ORDER BY spend_decile ASC;
 ```
 
-**Execution Performance**: `6230.73 ms`
+**Execution Performance**: `6763.51 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
@@ -1038,7 +1038,7 @@ FROM monthly_revenue
 ORDER BY purchase_month;
 ```
 
-**Execution Performance**: `2553.92 ms`
+**Execution Performance**: `2811.27 ms`
 
 **Actual Query Result (from live MySQL 8.0)**:
 
