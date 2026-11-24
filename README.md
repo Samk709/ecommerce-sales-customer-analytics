@@ -108,7 +108,7 @@ flowchart TD
 | **Data Manipulation** | **Pandas, NumPy** | In-memory transformations, vectorization, aggregation |
 | **Statistical & ML Modeling** | **Statsmodels, SciPy** | OLS regression (CSAT decay via SciPy stats), Holt-Winters Exponential Smoothing |
 | **Data Visualization** | **Plotly, Matplotlib, Seaborn** | Interactive UI charts, publication-ready statistical plots |
-| **Web Application** | **Streamlit** (v1.28+) | Multi-page executive dashboard with zero-database cloud architecture |
+| **Web Application** | **Streamlit** (v1.65.0) | Multi-page executive dashboard with zero-database cloud architecture |
 | **Business Intelligence** | **Power BI Desktop** (Specification) | Star Schema data model, 34 DAX measures, executive layout specs |
 | **Quality Assurance** | **Pytest** | 33 automated tests validating referential integrity and financial balance |
 | **Version Control** | **Git, GitHub** | Source tracking, semantic commits, cloud deployment trigger |
