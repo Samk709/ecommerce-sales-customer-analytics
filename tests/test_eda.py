@@ -56,7 +56,10 @@ def test_cohort_retention_structure_and_bounds():
     
     # Average Month 1 retention across cohorts should be structurally low (< 1.0%)
     m1_rates = df.loc["2017-01":"2017-12", "1"].dropna()
-    assert m1_rates.mean() < 1.0
+    assert round(m1_rates.mean(), 2) == 0.49
+    assert round(df.loc["2017-10", "1"], 2) == 0.72
+    assert round(df.loc["2017-03", "1"], 2) == 0.44
+    assert round(df.loc["2017-01":"2018-06", "1"].dropna().mean(), 2) == 0.47
 
 def test_clv_metrics_consistency():
     """Verify historical and segment-level Customer Lifetime Value consistency."""

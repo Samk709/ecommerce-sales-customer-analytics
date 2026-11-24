@@ -42,7 +42,7 @@ flowchart TD
     end
 
     subgraph Quality["5. Automated Pytest Validation"]
-        Q["Pytest Test Suite (39 Tests)\n(Referential, Financial, Logic Validation)"] -.-> D
+        Q["Pytest Test Suite (40 Tests)\n(Referential, Financial, Logic Validation)"] -.-> D
         Q -.-> N
         Q -.-> O
     end
@@ -91,7 +91,7 @@ flowchart TD
 │   ├── data_loader.py                 # Relative path cached CSV loader (@st.cache_data)
 │   ├── components.py                  # Custom CSS styling and HTML KPI cards
 │   └── views/                         # 5 report view modules (Overview, Products, Customers, Delivery, Forecast)
-├── tests/                             # Pytest automated test suite (39 passing tests)
+├── tests/                             # Pytest automated test suite (40 passing tests)
 ├── requirements.txt                   # Production pinned dependencies
 ├── .env.example                       # Secure environment configuration template
 └── README.md                          # Platform master documentation
@@ -110,7 +110,7 @@ flowchart TD
 | **Data Visualization** | **Plotly, Matplotlib, Seaborn** | Interactive UI charts, publication-ready statistical plots |
 | **Web Application** | **Streamlit** (v1.65.0) | Multi-page executive dashboard with zero-database cloud architecture |
 | **Business Intelligence** | **Power BI Desktop** (Specification) | Star Schema data model, 34 DAX measures, executive layout specs |
-| **Quality Assurance** | **Pytest** | 39 automated tests validating referential integrity and financial balance |
+| **Quality Assurance** | **Pytest** | 40 automated tests validating referential integrity and financial balance |
 | **Version Control** | **Git, GitHub** | Source tracking, semantic commits, cloud deployment trigger |
 
 ---
@@ -130,9 +130,9 @@ Every metric below is extracted directly from script executions and project logs
 | **Historical CLV (All Customers)** | **R$ 141.62** | `docs/eda_findings.md` (Section 3) | Average cumulative merchandise spend per unique customer. |
 | **Repeat Buyer CLV Premium** | **R$ 260.05 vs R$ 137.96** | `docs/eda_findings.md` (Section 3) | Repeat buyers generate **+88.5% higher lifetime value** than one-time buyers. |
 | **Top Value RFM Contribution** | **17.84% (R$ 2,358,970.15)** | `docs/eda_findings.md` (Section 1); `data/exports/rfm_segment_summary.csv` | 6,929 high-value customers (7.42% of base) spend an average of R$ 340.45. |
-| **Month-1 Cohort Retention** | **0.47%** | `docs/eda_findings.md` (Section 2); `data/exports/cohort_retention_matrix.csv` | Severe customer churn: average month-1 repurchase rate is under 0.5%. |
+| **Month-1 Cohort Retention** | **0.49% (2017 heatmap) / 0.47% (18 cohorts)** | `docs/eda_findings.md` (Section 2); `data/exports/cohort_retention_matrix.csv` | Severe customer churn: average month-1 repurchase rate is 0.49% across the 12 cohorts of 2017 (peaking at 0.72% in Oct 2017; Mar 2017 is 0.44%), and 0.47% unweighted across all 18 cohorts (Jan 2017–Jun 2018). |
 | **Product Pareto Concentration** | **25.93% (8,352 SKUs)** | `docs/eda_findings.md` (Section 4); `data/exports/pareto_product_summary.csv` | 25.93% of unique catalog products account for 80% of merchandise sales. |
-| **On-Time vs Late CSAT Score** | **4.29 vs 2.27 stars** | `docs/sql_results.md` (Query 8); `docs/eda_findings.md` (Section 5) | Immediate **2.02-star drop** when delivery breaches estimated SLA date. |
+| **On-Time vs Late CSAT Score** | **4.29 vs 2.27 stars** | `docs/sql_results.md` (Query 8); `docs/eda_findings.md` (Section 5) | Immediate **2.02-star drop** on delivery breach across 96,353 evaluated reviews (89,944 on-time vs 6,409 late; Query 8 excludes 8 delivered orders missing delivery dates from the 96,361 total in Query 5). |
 | **Late CSAT Degradation Slope** | **-0.0160 stars / day** | `docs/eda_findings.md` (Section 5) | OLS regression on late orders reveals steady rating erosion per day delayed. |
 | **Assumed Gross Margin** | **40.76% (R$ 5,388,818.98)** | `docs/sql_results.md` (Query 14) | Blended margin contribution across 11 sectors (*assumed margin, not real data*). |
 | **Forecast Holdout Accuracy** | **12.90% WAPE** | `docs/eda_findings.md` (Section 7) | 30-day Holt-Winters holdout test error (MAE: R$ 4,647.90 vs mean R$ 36,038.69). |
@@ -144,7 +144,7 @@ Every metric below is extracted directly from script executions and project logs
 Based on empirical data across the SQL warehouse and Python analytics pipelines, we prioritize four strategic business recommendations:
 
 1. **Mitigate Fulfillment SLA Breaches to Protect Brand Equity**:  
-   - **Data & Source**: On-time deliveries maintain an average CSAT of **4.29 stars** (89,944 reviews), whereas late deliveries suffer an immediate **2.02-star cliff down to 2.27 stars** (6,409 reviews with 62.41% 1–2 star detractors; `docs/sql_results.md` Query 8; `docs/eda_findings.md` Section 5). CSAT continues to erode at **-0.0160 stars per additional day late** via late-order OLS regression (`docs/eda_findings.md` Section 5). Overall, **6,534 delivered orders (6.77% of 96,470 evaluated orders)** breached their carrier estimated delivery date (`docs/sql_results.md` Query 13).  
+   - **Data & Source**: On-time deliveries maintain an average CSAT of **4.29 stars** (89,944 reviews), whereas late deliveries suffer an immediate **2.02-star cliff down to 2.27 stars** (6,409 reviews with 62.41% 1–2 star detractors; `docs/sql_results.md` Query 8; `docs/eda_findings.md` Section 5). Query 8 evaluates **96,353 reviews** with valid delivery dates, excluding 8 delivered orders lacking delivery dates from the platform's **96,361 total reviews** on delivered orders (`docs/sql_results.md` Query 5). CSAT continues to erode at **-0.0160 stars per additional day late** via late-order OLS regression (`docs/eda_findings.md` Section 5). Overall, **6,534 delivered orders (6.77% of 96,470 evaluated orders)** breached their carrier estimated delivery date (`docs/sql_results.md` Query 13).  
    - **Action**: Dynamically extend customer-facing delivery estimates by +2 business days on long-haul transit corridors to eliminate minor 1–3 day SLA breaches (1,870 orders; `docs/sql_results.md` Query 13), and deploy automated Day-1 breach notifications with R$ 15 freight credits to reduce detractor review submission.
 
 2. **Drive Targeted Re-Engagement Campaigns to Capture the Repeat Buyer CLV Premium**:  
@@ -152,7 +152,7 @@ Based on empirical data across the SQL warehouse and Python analytics pipelines,
    - **Action**: Implement automated post-purchase email and SMS re-engagement sequences timed at days 60–80 (preceding the 79.10-day reorder cycle) targeting Top Value buyers with personalized recommendations to cultivate repeat purchasing.
 
 3. **Expand High-Margin Consumable Categories to Offset Durable Churn**:  
-   - **Data & Source**: Average Month-1 repurchase retention is only **0.47%** across 2017 monthly cohorts (`docs/eda_findings.md` Section 2; `data/exports/cohort_retention_matrix.csv`), reflecting marketplace reliance on one-time durable goods. The top individual product category, `health_beauty`, generates **R$ 1,233,131.72** across 9,465 sold units (`docs/sql_results.md` Query 6), and the broader `Beauty & Personal Care` macro sector yields **R$ 1,624,777.16** in revenue and **R$ 812,388.58** in gross profit at a **50.00% assumed gross margin** (`docs/sql_results.md` Query 14; `config/margin_assumptions.yaml`).  
+   - **Data & Source**: Average Month-1 repurchase retention is only **0.49%** across the 12 monthly cohorts of 2017 shown in the heatmap, peaking at **0.72% in October 2017** (March 2017 is **0.44%**), and **0.47%** as an unweighted average across all 18 cohorts with follow-up from Jan 2017 to Jun 2018 (`docs/eda_findings.md` Section 2; `data/exports/cohort_retention_matrix.csv`), reflecting marketplace reliance on one-time durable goods. The top individual product category, `health_beauty`, generates **R$ 1,233,131.72** across 9,465 sold units (`docs/sql_results.md` Query 6), and the broader `Beauty & Personal Care` macro sector yields **R$ 1,624,777.16** in revenue and **R$ 812,388.58** in gross profit at a **50.00% assumed gross margin** (`docs/sql_results.md` Query 14; `config/margin_assumptions.yaml`).  
    - **Action**: Incentivize onboarding of consumable and replenishment merchants across personal care, beauty, and pet supplies with reduced platform take-rates to build high-frequency replenishment habits.
 
 4. **Restructure Logistics Subsidies for High-Freight Bulky Sectors**:  
@@ -294,7 +294,7 @@ The Streamlit web application is engineered for zero-database deployment. All da
 
 ## 10. Automated Testing & Quality Assurance
 
-A comprehensive test suite containing **39 automated unit tests** validates end-to-end data quality, database constraints, business queries, and financial balances:
+A comprehensive test suite containing **40 automated unit tests** validates end-to-end data quality, database constraints, business queries, and financial balances:
 
 ```powershell
 pytest -v tests
@@ -307,7 +307,7 @@ pytest -v tests
 - `tests/test_eda.py`: RFM customer and revenue balances, cohort bounds, Pareto distributions, and holdout WAPE validation (7 tests).
 - `tests/test_powerbi_exports.py`: Star Schema row counts, referential integrity, and financial totals (5 tests).
 - `tests/test_streamlit_kpis.py`: Standalone verification that unfiltered baseline KPIs match exact platform numbers (3 tests).
-- `tests/test_readme_reconciliation.py`: End-to-end validation of all published headline numbers and claims against exported data (6 tests).
+- `tests/test_readme_reconciliation.py`: End-to-end validation of all published headline numbers and claims against exported data (7 tests).
 
 ---
 

@@ -261,6 +261,10 @@ def run_cohort_retention(engine) -> dict:
     # Metrics for documentation
     avg_m1_retention = retention_matrix.loc["2017-01":"2018-06", 1].mean()
     max_m1_retention = retention_matrix.loc["2017-01":"2018-06", 1].max()
+    avg_2017_m1 = retention_matrix.loc["2017-01":"2017-12", 1].mean()
+    max_2017_m1 = retention_matrix.loc["2017-01":"2017-12", 1].max()
+    max_2017_cohort = retention_matrix.loc["2017-01":"2017-12", 1].idxmax()
+    mar_2017_m1 = retention_matrix.loc["2017-03", 1]
 
     logger.info("Module 2 complete.")
     return {
@@ -268,6 +272,10 @@ def run_cohort_retention(engine) -> dict:
         "cohort_sizes": cohort_sizes,
         "avg_m1_retention": avg_m1_retention,
         "max_m1_retention": max_m1_retention,
+        "avg_2017_m1": avg_2017_m1,
+        "max_2017_m1": max_2017_m1,
+        "max_2017_cohort": max_2017_cohort,
+        "mar_2017_m1": mar_2017_m1,
         "chart_path": chart_path
     }
 
@@ -715,7 +723,7 @@ def generate_eda_markdown(rfm_res, cohort_res, clv_res, pareto_res, csat_res, pr
     md.append(f"| **Overall Historical CLV** | **R$ {clv_res['historical_clv']:,.2f}** | Average lifetime spend per unique customer |\n")
     md.append(f"| **Margin-Adjusted Historical CLV** | **R$ {clv_res['margin_adjusted_clv']:,.2f}** | Average gross profit contribution per customer *(Assumed)* |\n")
     md.append(f"| **Repeat Buyer CLV Premium** | **R$ {clv_res['clv_repeat']:,.2f} vs R$ {clv_res['clv_onetime']:,.2f}** | Repeat customers spend **+{((clv_res['clv_repeat']/clv_res['clv_onetime'])-1)*100:.1f}%** more than one-time buyers |\n")
-    md.append(f"| **Month 1 Cohort Retention** | **{cohort_res['avg_m1_retention']:.2f}%** | Platform-wide average repeat retention in month 1 |\n")
+    md.append(f"| **Month 1 Cohort Retention** | **{cohort_res['avg_2017_m1']:.2f}% (2017 heatmap) / {cohort_res['avg_m1_retention']:.2f}% (18 cohorts)** | Average repeat retention in month 1 ({cohort_res['avg_2017_m1']:.2f}% across 12 heatmap cohorts; {cohort_res['avg_m1_retention']:.2f}% unweighted across 18 cohorts Jan 2017–Jun 2018; peak {cohort_res['max_2017_m1']:.2f}% in Oct 2017) |\n")
     md.append(f"| **Product Pareto Concentration** | **{pareto_res['pct_80']:.2f}% ({pareto_res['count_80']:,} SKUs)** | Proportion of products generating 80% of revenue |\n")
     md.append(f"| **On-Time vs Late CSAT Score** | **{csat_res['ontime_score']:.2f} vs {csat_res['late_score']:.2f} stars** | Discontinuous CSAT rating drop of **{csat_res['ontime_score'] - csat_res['late_score']:.2f} stars** on date breach |\n")
     md.append(f"| **Late-Only CSAT Degradation Rate** | **{csat_res['slope_late']:.4f} stars/day** | CSAT score decline per additional day of delay on late orders (`delay_days > 0`) |\n")
@@ -785,11 +793,12 @@ def generate_eda_markdown(rfm_res, cohort_res, clv_res, pareto_res, csat_res, pr
     md.append("## 2. Monthly Cohort Retention Analysis\n\n")
     md.append("### Cohort Decay Behavior\n")
     md.append("Tracking monthly acquisition cohorts from January 2017 to December 2017 reveals that customer retention is structurally low across all cohorts:\n\n")
-    md.append(f"- **Month 1 Retention Average**: **{cohort_res['avg_m1_retention']:.2f}%** across cohorts.\n")
-    md.append(f"- **Month 1 Retention Peak**: **{cohort_res['max_m1_retention']:.2f}%**.\n")
+    md.append(f"- **Month 1 Retention Average (2017 Heatmap Cohorts)**: **{cohort_res['avg_2017_m1']:.2f}%** (simple unweighted average across the 12 displayed 2017 monthly cohorts: Jan 2017 to Dec 2017).\n")
+    md.append(f"- **Month 1 Retention Average (18 Observed Cohorts)**: **{cohort_res['avg_m1_retention']:.2f}%** (simple unweighted average across all 18 cohorts from Jan 2017 to Jun 2018 having >= 1 month observable repurchase follow-up).\n")
+    md.append(f"- **Month 1 Retention Peak**: **{cohort_res['max_2017_m1']:.2f}%** (achieved by the **October 2017 cohort**; the March 2017 cohort recorded **{cohort_res['mar_2017_m1']:.2f}%**).\n")
     md.append("- **Zero Return Months**: In the retention matrix and heatmap, observed calendar months where zero customers returned are displayed explicitly as **0.00**, while unobserved future months remain blank.\n\n")
     md.append("![Cohort Retention Heatmap](screenshots/cohort_retention_heatmap.png)\n\n")
-    md.append(f"> **Business Insight**: Retention is near zero after the initial purchase month ({cohort_res['avg_m1_retention']:.2f}% in Month 1). Olist operates as an acquisition-dependent transaction marketplace rather than a sticky repeat ecosystem.\n\n")
+    md.append(f"> **Business Insight**: Retention is near zero after the initial purchase month ({cohort_res['avg_2017_m1']:.2f}% average across 2017 cohorts, {cohort_res['avg_m1_retention']:.2f}% across 18 cohorts). Olist operates as an acquisition-dependent transaction marketplace rather than a sticky repeat ecosystem.\n\n")
     md.append("> **Actionable Recommendation**: Introduce post-purchase cross-category replenishment triggers (e.g., consumable accessories for Electronics, beauty refills) delivered 30-45 days post-purchase to drive first-to-second order conversion.\n\n")
     md.append("---\n\n")
 

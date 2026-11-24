@@ -14,7 +14,7 @@
 | **Overall Historical CLV** | **R$ 141.62** | Average lifetime spend per unique customer |
 | **Margin-Adjusted Historical CLV** | **R$ 57.72** | Average gross profit contribution per customer *(Assumed)* |
 | **Repeat Buyer CLV Premium** | **R$ 260.05 vs R$ 137.96** | Repeat customers spend **+88.5%** more than one-time buyers |
-| **Month 1 Cohort Retention** | **0.47%** | Platform-wide average repeat retention in month 1 |
+| **Month 1 Cohort Retention** | **0.49% (2017 heatmap) / 0.47% (18 cohorts)** | Average repeat retention in month 1 (0.49% across 12 heatmap cohorts; 0.47% unweighted across 18 cohorts Jan 2017–Jun 2018; peak 0.72% in Oct 2017) |
 | **Product Pareto Concentration** | **25.93% (8,352 SKUs)** | Proportion of products generating 80% of revenue |
 | **On-Time vs Late CSAT Score** | **4.29 vs 2.27 stars** | Discontinuous CSAT rating drop of **2.02 stars** on date breach |
 | **Late-Only CSAT Degradation Rate** | **-0.0160 stars/day** | CSAT score decline per additional day of delay on late orders (`delay_days > 0`) |
@@ -97,13 +97,14 @@ In this model, **100% of the platform's 2,801 repeat buyers are partitioned betw
 ### Cohort Decay Behavior
 Tracking monthly acquisition cohorts from January 2017 to December 2017 reveals that customer retention is structurally low across all cohorts:
 
-- **Month 1 Retention Average**: **0.47%** across cohorts.
-- **Month 1 Retention Peak**: **0.72%**.
+- **Month 1 Retention Average (2017 Heatmap Cohorts)**: **0.49%** (simple unweighted average across the 12 displayed 2017 monthly cohorts: Jan 2017 to Dec 2017).
+- **Month 1 Retention Average (18 Observed Cohorts)**: **0.47%** (simple unweighted average across all 18 cohorts from Jan 2017 to Jun 2018 having $\ge 1$ month observable repurchase follow-up).
+- **Month 1 Retention Peak**: **0.72%** (achieved by the **October 2017 cohort**; the March 2017 cohort recorded **0.44%**).
 - **Zero Return Months**: In the retention matrix and heatmap, observed calendar months where zero customers returned are displayed explicitly as **0.00**, while unobserved future months remain blank.
 
 ![Cohort Retention Heatmap](screenshots/cohort_retention_heatmap.png)
 
-> **Business Insight**: Retention is near zero after the initial purchase month (0.47% in Month 1). Olist operates as an acquisition-dependent transaction marketplace rather than a sticky repeat ecosystem.
+> **Business Insight**: Retention is near zero after the initial purchase month (0.49% average across 2017 cohorts, 0.47% across 18 cohorts). Olist operates as an acquisition-dependent transaction marketplace rather than a sticky repeat ecosystem.
 
 > **Actionable Recommendation**: Introduce post-purchase cross-category replenishment triggers (e.g., consumable accessories for Electronics, beauty refills) delivered 30-45 days post-purchase to drive first-to-second order conversion.
 

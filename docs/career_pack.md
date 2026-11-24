@@ -14,13 +14,13 @@ Each bullet incorporates the **Action-Context-Result** framework with exact, ver
 - **Segmented Customer Base via Hybrid RFM Model**: Designed a hybrid discrete-quantile RFM segmentation model across **93,358 unique customers**, overcoming a severe **97.00% single-order bias** to isolate **6,929 Top Value customers** driving **R$ 2,358,970.15** (**17.84%** of revenue) with an average spend of **R$ 340.45** (**+140.4%** above platform average of R$ 141.62).  
   *(Source: `docs/eda_findings.md` Section 1; `data/exports/rfm_segment_summary.csv`)*
 
-- **Quantified Customer Retention & Unit Economics**: Modeled historical Customer Lifetime Value (CLV) proving repeat customers (**2,801 users**, **3.00%** of customer base) generate an **+88.5% CLV premium** (**R$ 260.05 vs R$ 137.96**), while diagnosing monthly cohort retention across 2017 to reveal a **0.47% Month-1 retention rate**, shifting commercial strategy from acquisition to retention.  
+- **Quantified Customer Retention & Unit Economics**: Modeled historical Customer Lifetime Value (CLV) proving repeat customers (**2,801 users**, **3.00%** of customer base) generate an **+88.5% CLV premium** (**R$ 260.05 vs R$ 137.96**), while diagnosing monthly cohort retention across 2017 to reveal a **0.49% Month-1 retention rate** across the 2017 heatmap cohorts (**0.47%** across all 18 observed cohorts Jan 2017–Jun 2018; peak **0.72% in October 2017**), shifting commercial strategy from acquisition to retention.  
   *(Source: `docs/eda_findings.md` Sections 2 & 3; `data/exports/cohort_retention_matrix.csv`)*
 
-- **Analyzed Logistics SLA Impact on CSAT**: Evaluated **96,361 customer review ratings** against calendar delivery dates, identifying an immediate **2.02-star customer satisfaction cliff** upon delivery SLA breach (**4.29 on-time vs 2.27 late stars**) and modeling ongoing delay penalty at **-0.0160 stars/day late** ($p = 3.48 \times 10^{-32}$) via OLS regression.  
+- **Analyzed Logistics SLA Impact on CSAT**: Evaluated **96,353 customer review ratings** with verified delivery dates against calendar delivery deadlines (Query 8; out of **96,361 total reviews** on delivered orders in Query 5, excluding 8 orders lacking delivery dates), identifying an immediate **2.02-star customer satisfaction cliff** upon delivery SLA breach (**4.29 on-time vs 2.27 late stars**) and modeling ongoing delay penalty at **-0.0160 stars/day late** ($p = 3.48 \times 10^{-32}$) via OLS regression.  
   *(Source: `docs/sql_results.md` Query 5 & Query 8; `docs/eda_findings.md` Section 5)*
 
-- **Developed Zero-Database Web App & Production Tests**: Deployed a zero-database interactive Streamlit analytics application with reactive multi-dimensional filtering, 30-day Holt-Winters revenue forecasting (**12.90% holdout WAPE**, **R$ 4,647.90 MAE**), and built an automated **39-test pytest suite** ensuring 100% financial reconciliation across SQL, Python, and UI layers.  
+- **Developed Zero-Database Web App & Production Tests**: Deployed a zero-database interactive Streamlit analytics application with reactive multi-dimensional filtering, 30-day Holt-Winters revenue forecasting (**12.90% holdout WAPE**, **R$ 4,647.90 MAE**), and built an automated **40-test pytest suite** ensuring 100% financial reconciliation across SQL, Python, and UI layers.  
   *(Source: `docs/eda_findings.md` Section 7; `tests/test_streamlit_kpis.py`)*
 
 ---
@@ -50,7 +50,7 @@ Built a 30-day additive Holt-Winters forecast capturing weekly seasonality, vali
 • SQL (MySQL 8.0): Normalized relational schema, CTEs, Window Functions, Query Optimization
 • Python (Pandas, Plotly, Statsmodels, SciPy): ETL, Cohort Retention, OLS Regression, Time-Series
 • Streamlit: Multi-page interactive executive web dashboard with zero-database cloud architecture
-• QA: 39 automated tests validating referential integrity and financial balance
+• QA: 40 automated tests validating referential integrity and financial balance
 
 🔗 Check out the full GitHub repository, SQL queries, and interactive dashboard code:
 https://github.com/Samk709/ecommerce-sales-customer-analytics
@@ -152,7 +152,7 @@ Even though repeat customers comprise only 3.00% of the customer base, their uni
 #### Q11: Explain your cohort retention methodology. What did the 2017 monthly cohort heatmap reveal?
 **Answer:**  
 "Cohorts were defined by customer acquisition month (the month of their very first delivered order) from January 2017 to December 2017, tracking their repurchase activity across subsequent elapsed months ($t_0, t_1, \dots, t_{12}$). Crucially, observed elapsed periods with zero repeat purchases were explicitly encoded as `0.00%`, rather than being left blank or imputed.  
-The analysis revealed an average Month-1 retention rate of only **0.47%**, peaking at 0.72% (March 2017 cohort) and decaying to 0.10%-0.20% by Month 6. This confirms that Olist operated primarily as an acquisition-driven marketplace for durable goods (furniture, appliances, electronics) rather than a habit-forming consumable platform. Marketplace strategy must therefore focus on category expansion into recurring consumables (health, beauty, food) to drive repeat frequency."
+The analysis revealed that across the 12 monthly cohorts shown in the 2017 retention heatmap, Month-1 retention averages **0.49%**, peaking at **0.72% for the October 2017 cohort** (the March 2017 cohort is **0.44%**) and decaying to 0.10%-0.20% by Month 6. (Across all 18 cohorts from January 2017 to June 2018 with observed follow-up, the unweighted Month-1 average is **0.47%**). This confirms that Olist operated primarily as an acquisition-driven marketplace for durable goods (furniture, appliances, electronics) rather than a habit-forming consumable platform. Marketplace strategy must therefore focus on category expansion into recurring consumables (health, beauty, food) to drive repeat frequency."
 
 ---
 
@@ -181,12 +181,12 @@ Instead, I decoupled analytics delivery from the database:
 
 #### Q15: How did you ensure data quality and financial reconciliation across your pipeline?
 **Answer:**  
-"I developed an automated 39-test suite in `pytest` organized into 7 test modules:
+"I developed an automated 40-test suite in `pytest` organized into 7 test modules:
 1. `test_data_quality.py`: Verifies primary key uniqueness, non-null constraints, price/freight non-negativity, and coordinate bounds.
 2. `test_db_connection.py`: Validates MySQL 8.0 connectivity and verifies schema table creation.
-3. `test_sql_queries.py`: Reconciles business queries against mathematical balances (e.g., running cumulative sales equal grand total; Q14 COGS + Gross Profit equal Merchandise Revenue R$ 13,221,498.11; Q5 reviews sum to 96,361).
+3. `test_sql_queries.py`: Reconciles business queries against mathematical balances (e.g., running cumulative sales equal grand total; Q14 COGS + Gross Profit equal Merchandise Revenue R$ 13,221,498.11; Q5 reviews sum to 96,361 on delivered orders; Q8 reviews with verified delivery dates sum to 96,353 across 89,944 on-time and 6,409 late reviews).
 4. `test_eda.py`: Confirms RFM segment customer counts sum to 93,358 and revenue sums to R$ 13,221,498.11; confirms holdout WAPE matches 12.90%.
 5. `test_powerbi_exports.py`: Validates Star Schema row counts, referential integrity between dimensions and facts, and financial reconciliation.
 6. `test_streamlit_kpis.py`: Ensures the Streamlit calculation engine reproduces the exact baseline figures (R$ 13,221,498.11 revenue, 96,478 orders, 2,801 repeat buyers) with zero filters and sub-filters accurately.  
-7. `test_readme_reconciliation.py`: End-to-end automated assertions confirming all published metrics in the README and career pack match export CSVs and underlying statistical models.  
+7. `test_readme_reconciliation.py`: End-to-end automated assertions confirming all published metrics in the README and career pack match export CSVs and underlying statistical models (7 tests).  
 This continuous testing guarantees that numbers presented to executive stakeholders are mathematically infallible."

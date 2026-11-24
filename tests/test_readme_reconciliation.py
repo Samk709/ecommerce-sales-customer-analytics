@@ -22,6 +22,7 @@ def export_tables():
     forecast = pd.read_csv(os.path.join(EXPORTS_DIR, "daily_sales_forecast.csv"))
     category_profit = pd.read_csv(os.path.join(EXPORTS_DIR, "category_profitability_summary.csv"))
     csat_summary = pd.read_csv(os.path.join(EXPORTS_DIR, "delivery_csat_delay_summary.csv"))
+    reviews = pd.read_csv(os.path.join(EXPORTS_DIR, "fact_order_reviews.csv"))
     return {
         "orders": orders,
         "items": items,
@@ -32,6 +33,7 @@ def export_tables():
         "forecast": forecast,
         "category_profit": category_profit,
         "csat_summary": csat_summary,
+        "reviews": reviews,
     }
 
 def test_readme_platform_sales_and_orders(export_tables):
@@ -141,7 +143,8 @@ def test_readme_pareto_cohort_and_forecast(export_tables):
     """
     Validates Pareto, Cohort, and Forecast metrics:
     - Pareto 80% SKU cutoff: 8,352 SKUs (25.93% of 32,216 products)
-    - Cohort Month 1 retention average = 0.47%
+    - Cohort Month 1: 0.49% for 12-month 2017 heatmap cohorts; peak 0.72% in Oct 2017; Mar 2017 is 0.44%
+    - Cohort Month 1: 0.47% unweighted average across 18 cohorts (2017-01 to 2018-06)
     - Forecast Holdout WAPE = 12.90%
     """
     pareto = export_tables["pareto"]
@@ -151,12 +154,20 @@ def test_readme_pareto_cohort_and_forecast(export_tables):
     assert round(cutoff_count * 100.0 / len(pareto), 2) == 25.93
     
     cohort = export_tables["cohort"]
-    # 2017-01 to 2018-06 monthly cohorts average in month 1
     cohort_df = cohort.set_index("cohort_month")
-    m1_mean = round(float(cohort_df.loc["2017-01":"2018-06", "1"].mean()), 2)
-    m1_max = round(float(cohort_df.loc["2017-01":"2018-06", "1"].max()), 2)
-    assert m1_mean == 0.47
-    assert m1_max == 0.72
+    
+    # 1. 2017 Heatmap Cohorts (12 months: 2017-01 to 2017-12)
+    m1_2017_mean = round(float(cohort_df.loc["2017-01":"2017-12", "1"].mean()), 2)
+    m1_oct_2017 = round(float(cohort_df.loc["2017-10", "1"]), 2)
+    m1_mar_2017 = round(float(cohort_df.loc["2017-03", "1"]), 2)
+    
+    assert m1_2017_mean == 0.49
+    assert m1_oct_2017 == 0.72
+    assert m1_mar_2017 == 0.44
+    
+    # 2. All 18 Observed Cohorts with follow-up (2017-01 to 2018-06)
+    m1_18_mean = round(float(cohort_df.loc["2017-01":"2018-06", "1"].mean()), 2)
+    assert m1_18_mean == 0.47
     
     forecast = export_tables["forecast"]
     test_rows = forecast[forecast["test_prediction_brl"].notna() & forecast["actual_revenue_brl"].notna()]
@@ -167,6 +178,63 @@ def test_readme_pareto_cohort_and_forecast(export_tables):
         2
     )
     assert wape == 12.90
+
+def test_readme_review_counts_and_csat_reconciliation(export_tables):
+    """
+    Validates review counts and CSAT claims between Query 5 and Query 8:
+    - Query 5 delivered reviews = 96,361 (across all 96,478 delivered orders)
+    - Delivered orders with NULL delivery date = 8 (each having 1 review = 8 reviews)
+    - Query 8 reviews evaluated = 96,353 (89,944 on-time + 6,409 late)
+    - 96,361 (Query 5) - 96,353 (Query 8) == 8 reviews missing delivery dates
+    - On-time CSAT = 4.29 stars (9.28% detractors, 62.26% promoters)
+    - Late CSAT = 2.27 stars (62.41% detractors, 16.54% promoters)
+    """
+    orders = export_tables["orders"]
+    reviews = export_tables["reviews"]
+    csat_summary = export_tables["csat_summary"]
+    
+    delivered_orders = orders[orders["order_status"] == "delivered"]
+    assert len(delivered_orders) == 96478
+    
+    # Query 5: All reviews on delivered orders
+    deliv_reviews = reviews.merge(delivered_orders[["order_id"]], on="order_id")
+    assert len(deliv_reviews) == 96361
+    
+    # Orders with NULL delivery date
+    null_delivery_orders = delivered_orders[delivered_orders["order_delivered_customer_date_only"].isna()]
+    assert len(null_delivery_orders) == 8
+    null_delivery_reviews = reviews.merge(null_delivery_orders[["order_id"]], on="order_id")
+    assert len(null_delivery_reviews) == 8
+    
+    # Query 8: Delivered orders with non-null delivery date
+    valid_delivery_orders = delivered_orders[delivered_orders["order_delivered_customer_date_only"].notna()]
+    assert len(valid_delivery_orders) == 96470
+    valid_delivery_reviews = reviews.merge(valid_delivery_orders[["order_id", "is_delayed"]], on="order_id")
+    assert len(valid_delivery_reviews) == 96353
+    
+    # Reconcile exact difference
+    assert len(deliv_reviews) - len(valid_delivery_reviews) == 8
+    
+    ontime_rev = valid_delivery_reviews[valid_delivery_reviews["is_delayed"] == 0]
+    late_rev = valid_delivery_reviews[valid_delivery_reviews["is_delayed"] == 1]
+    assert len(ontime_rev) == 89944
+    assert len(late_rev) == 6409
+    assert len(ontime_rev) + len(late_rev) == 96353
+    
+    # Delay summary breakdown
+    ontime_row = csat_summary[csat_summary["delay_bucket"].str.contains("On-Time")].iloc[0]
+    assert ontime_row["review_count"] == 89944
+    assert round(ontime_row["avg_review_score"], 2) == 4.29
+    assert round(ontime_row["detractor_pct_1_2"], 2) == 9.28
+    assert round(ontime_row["promoter_pct_5"], 2) == 62.26
+    
+    late_rows = csat_summary[~csat_summary["delay_bucket"].str.contains("On-Time")]
+    assert late_rows["review_count"].sum() == 6409
+    late_avg_score = round(
+        (late_rows["avg_review_score"] * late_rows["review_count"]).sum() / late_rows["review_count"].sum(),
+        2
+    )
+    assert late_avg_score == 2.27
 
 def test_readme_profitability_and_category_reconciliation(export_tables):
     """
