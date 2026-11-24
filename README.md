@@ -1,6 +1,8 @@
 # E-Commerce Sales & Customer Intelligence Analytics Platform
 
-An enterprise-grade, end-to-end data analytics and customer intelligence platform built on the **Olist Brazilian E-Commerce** ecosystem (~100k orders, 2016–2018).
+**Live demo**: link coming after deployment
+
+An end-to-end data analytics and customer intelligence platform built on the **Olist Brazilian E-Commerce** ecosystem (~100k orders, 2016–2018).
 
 > **Currency Specification**: All monetary values across this platform are denominated strictly in **Brazilian Reais (R$ / BRL)**.  
 > **Revenue Definition**: Revenue refers strictly to delivered transactions (`order_status = 'delivered'`) and excludes shipping freight charges, unless explicitly designated as Gross Merchandise Value (GMV).  
@@ -19,10 +21,10 @@ flowchart TD
     end
 
     subgraph Database["2. Relational Data Warehouse"]
-        C --> D["MySQL 8.0 Engine\n(3NF Normalized Schema)"]
+        C --> D["MySQL 8.0 Engine\n(Normalized Relational Schema)"]
         D --> E["Primary & Foreign Key Constraints"]
-        D --> F["Covering B-Tree Indexes\n(sql/schema/03_create_indexes.sql)"]
-        D --> G["24 Business SQL Queries\n(Basic, Joins, CTEs, Window Functions)"]
+        D --> F["B-Tree Indexes\n(sql/schema/03_create_indexes.sql)"]
+        D --> G["22 Business SQL Queries\n(Basic, Joins, CTEs, Window Functions)"]
     end
 
     subgraph Intelligence["3. Analytics & Customer Intelligence"]
@@ -39,7 +41,7 @@ flowchart TD
         N --> P["Power BI Analytical Specs\n(Model, DAX Measures, Layout Specs)"]
     end
 
-    subgraph Quality["5. Automated CI/CD Testing"]
+    subgraph Quality["5. Automated Pytest Validation"]
         Q["Pytest Test Suite (33 Tests)\n(Referential, Financial, Logic Validation)"] -.-> D
         Q -.-> N
         Q -.-> O
@@ -56,27 +58,28 @@ flowchart TD
 ├── data/
 │   ├── raw/                           # Original Kaggle Olist CSVs (git-ignored)
 │   ├── processed/                     # Cleaned relational CSVs ready for DB ingestion (git-ignored)
-│   └── exports/                       # Analytical Star Schema CSVs & model outputs (git-ignored)
+│   └── exports/                       # Analytical Star Schema CSVs & model outputs (tracked for cloud deployment)
 ├── docs/
 │   ├── data_dictionary.md             # Complete relational & star schema data dictionary
 │   ├── eda_findings.md                # In-depth statistical analysis, RFM, cohorts, and logistics report
-│   ├── sql_results.md                 # 24 business SQL queries with results and business insights
+│   ├── sql_results.md                 # 22 business SQL queries with results and business insights
 │   ├── career_pack.md                 # Resume bullets, LinkedIn post, and 15 technical interview Q&As
 │   └── screenshots/                   # High-resolution dashboard and visualization captures
 ├── power_bi/
 │   ├── data_model_spec.md             # Star Schema relationships, cardinalities, and storage settings
-│   ├── dax_measures.md                # 28 production DAX formulas (Time Intelligence, Slicing, CSAT)
+│   ├── dax_measures.md                # 34 production DAX formulas (Time Intelligence, Slicing, CSAT)
 │   └── dashboard_layout_spec.md       # Visual hierarchy, KPI cards, and canvas layout blueprint
 ├── sql/
-│   ├── schema/                        # DDL table creation and covering index scripts
+│   ├── schema/                        # DDL table creation and index scripts
 │   │   ├── 01_create_database.sql
 │   │   ├── 02_create_tables.sql
 │   │   └── 03_create_indexes.sql
-│   └── queries/                       # 24 business SQL queries organized by difficulty tier
-│       ├── 01_basic_aggregations.sql
-│       ├── 02_joins_and_grouping.sql
-│       ├── 03_ctes_and_subqueries.sql
-│       └── 04_window_functions.sql
+│   └── queries/                       # 22 business SQL queries organized by difficulty tier
+│       ├── all_business_queries.sql
+│       ├── tier1_basic_aggregations.sql
+│       ├── tier2_joins_grouping.sql
+│       ├── tier3_subqueries_ctes.sql
+│       └── tier4_window_functions_advanced.sql
 ├── src/
 │   ├── config.py                      # Environment and margin assumption loader
 │   ├── preprocessing/                 # Raw data audit and cleaning pipeline
@@ -100,15 +103,15 @@ flowchart TD
 
 | Domain | Technologies & Libraries | Purpose |
 | :--- | :--- | :--- |
-| **Relational Database** | **MySQL 8.0**, MySQL Workbench | 3NF operational warehouse, foreign keys, covering indexes, stored queries |
-| **Programming Language** | **Python 3.10 / 3.11** | Core data pipelines, statistical modeling, API wrappers |
+| **Relational Database** | **MySQL 8.0**, MySQL Workbench | Normalized relational operational warehouse, foreign keys, indexes, stored queries |
+| **Programming Language** | **Python 3.10 / 3.11** | Core data pipelines, statistical modeling, analytical calculations |
 | **Data Manipulation** | **Pandas, NumPy** | In-memory transformations, vectorization, aggregation |
-| **Statistical & ML Modeling** | **Statsmodels, SciPy, Scikit-Learn** | OLS regression (CSAT decay), Holt-Winters Exponential Smoothing |
+| **Statistical & ML Modeling** | **Statsmodels, SciPy** | OLS regression (CSAT decay via SciPy stats), Holt-Winters Exponential Smoothing |
 | **Data Visualization** | **Plotly, Matplotlib, Seaborn** | Interactive UI charts, publication-ready statistical plots |
 | **Web Application** | **Streamlit** (v1.28+) | Multi-page executive dashboard with zero-database cloud architecture |
-| **Business Intelligence** | **Power BI Desktop** (Specification) | Star Schema data model, 28 DAX measures, executive layout specs |
+| **Business Intelligence** | **Power BI Desktop** (Specification) | Star Schema data model, 34 DAX measures, executive layout specs |
 | **Quality Assurance** | **Pytest** | 33 automated tests validating referential integrity and financial balance |
-| **Version Control & CI** | **Git, GitHub** | Source tracking, semantic commits, cloud deployment trigger |
+| **Version Control** | **Git, GitHub** | Source tracking, semantic commits, cloud deployment trigger |
 
 ---
 
@@ -122,21 +125,43 @@ Every metric below is extracted directly from script executions and project logs
 | **Gross Merchandise Value (GMV)** | **R$ 15,419,773.75** | `docs/sql_results.md` (Query 1) | Merchandise sales + R$ 2,198,275.64 logistics freight. |
 | **Total Delivered Orders** | **96,478** | `docs/sql_results.md` (Query 1) | Completed orders (out of 99,441 total recorded order attempts). |
 | **Total Unique Customers** | **93,358** | `docs/eda_findings.md` (Executive Summary) | Distinct individuals tracked via `customer_unique_id`. |
-| **Repeat Customer Count** | **2,801 (3.00%)** | `docs/eda_findings.md` (Section 1); `docs/sql_results.md` (Query 18) | Only 3.00% of customers purchase $\ge 2$ times (97.00% buy once). |
+| **Repeat Customer Count** | **2,801 (3.00%)** | `docs/eda_findings.md` (Section 1); `docs/sql_results.md` (Query 11) | Only 3.00% of customers purchase $\ge 2$ times (97.00% buy once). |
 | **Average Order Value (AOV)** | **R$ 137.04** | `docs/sql_results.md` (Query 1) | Average net basket value per delivered order. |
 | **Historical CLV (All Customers)** | **R$ 141.62** | `docs/eda_findings.md` (Section 3) | Average cumulative merchandise spend per unique customer. |
 | **Repeat Buyer CLV Premium** | **R$ 260.05 vs R$ 137.96** | `docs/eda_findings.md` (Section 3) | Repeat buyers generate **+88.5% higher lifetime value** than one-time buyers. |
 | **Top Value RFM Contribution** | **17.84% (R$ 2,358,970.15)** | `docs/eda_findings.md` (Section 1); `data/exports/rfm_segment_summary.csv` | 6,929 high-value customers (7.42% of base) spend an average of R$ 340.45. |
 | **Month-1 Cohort Retention** | **0.47%** | `docs/eda_findings.md` (Section 2); `data/exports/cohort_retention_matrix.csv` | Severe customer churn: average month-1 repurchase rate is under 0.5%. |
 | **Product Pareto Concentration** | **25.93% (8,352 SKUs)** | `docs/eda_findings.md` (Section 4); `data/exports/pareto_product_summary.csv` | 25.93% of unique catalog products account for 80% of merchandise sales. |
-| **On-Time vs Late CSAT Score** | **4.29 vs 2.27 stars** | `docs/sql_results.md` (Query 13); `docs/eda_findings.md` (Section 5) | Immediate **2.02-star drop** when delivery breaches estimated SLA date. |
+| **On-Time vs Late CSAT Score** | **4.29 vs 2.27 stars** | `docs/sql_results.md` (Query 8); `docs/eda_findings.md` (Section 5) | Immediate **2.02-star drop** when delivery breaches estimated SLA date. |
 | **Late CSAT Degradation Slope** | **-0.0160 stars / day** | `docs/eda_findings.md` (Section 5) | OLS regression on late orders reveals steady rating erosion per day delayed. |
 | **Assumed Gross Margin** | **40.76% (R$ 5,388,818.98)** | `docs/sql_results.md` (Query 14) | Blended margin contribution across 11 sectors (*assumed margin, not real data*). |
 | **Forecast Holdout Accuracy** | **12.90% WAPE** | `docs/eda_findings.md` (Section 7) | 30-day Holt-Winters holdout test error (MAE: R$ 4,647.90 vs mean R$ 36,038.69). |
 
 ---
 
-## 5. Interactive Streamlit Web Application
+## 5. Key Recommendations
+
+Based on empirical data across the SQL warehouse and Python analytics pipelines, we prioritize four strategic business recommendations:
+
+1. **Mitigate Fulfillment SLA Breaches to Protect Brand Equity**:  
+   - **Data & Source**: On-time deliveries average **4.29 stars**, while delayed deliveries trigger an immediate **2.02-star drop to 2.27 stars** (`docs/sql_results.md` Query 8; `docs/eda_findings.md` Section 5), with CSAT eroding further at **-0.0160 stars per additional day late**. **7.23% (6,985 orders)** breached SLA (`docs/sql_results.md` Query 13).  
+   - **Action**: Dynamically extend estimated delivery promises by +2 business days for inter-state transit corridors and trigger proactive automated Day-1 breach notifications with R$ 15 shipping vouchers before reviews are submitted.
+
+2. **Drive Targeted Re-Engagement Campaigns to Capture the Repeat Buyer CLV Premium**:  
+   - **Data & Source**: Only **3.00% (2,801 customers)** make repeat purchases, yet repeat buyers generate an **+88.5% CLV premium** (**R$ 260.05 vs R$ 137.96**; `docs/eda_findings.md` Section 3). Average repurchase latency is **41.48 days** (`docs/sql_results.md` Query 20).  
+   - **Action**: Implement personalized lifecycle email campaigns at days 30–45 post-delivery targeting the **6,929 Top Value** RFM segment (`data/exports/rfm_segment_summary.csv`), who currently generate **17.84% (R$ 2,358,970.15)** of total platform revenue.
+
+3. **Expand High-Margin Consumable Categories to Offset Durable Churn**:  
+   - **Data & Source**: Month-1 cohort retention averages only **0.47%** (`docs/eda_findings.md` Section 2; `data/exports/cohort_retention_matrix.csv`), reflecting marketplace skew toward one-time durable goods. Categories like Health & Beauty generate **R$ 1,258,836.12** in merchandise revenue at a **45.0% assumed gross margin** (`docs/sql_results.md` Query 14; `config/margin_assumptions.yaml`).  
+   - **Action**: Incentivize onboarding of consumable and replenishment merchants (beauty, wellness, pet care) with lower seller take-rates to cultivate high-frequency purchasing habits.
+
+4. **Restructure Logistics Subsidies for High-Freight Bulky Sectors**:  
+   - **Data & Source**: Shipping freight represents **14.26% (R$ 2,198,275.64)** of platform GMV (`docs/sql_results.md` Query 1), but surges to **20.88% (R$ 152,065.73)** in Construction & Tools and **20.83% (R$ 254,498.42)** in Furniture (`docs/sql_results.md` Query 9).  
+   - **Action**: Negotiate contracted volume freight discounts with regional carriers and test tiered free-shipping thresholds above R$ 200 on bulky goods to reduce checkout funnel abandonment.
+
+---
+
+## 6. Interactive Streamlit Web Application
 
 The interactive web dashboard is located in `streamlit_app/`. It reads exclusively from pre-aggregated analytical Star Schema CSVs in `data/exports/` using `@st.cache_data`.
 
@@ -168,27 +193,24 @@ Demonstrates reactive dashboard recalculation when filtered by Customer State = 
 
 ---
 
-## 6. Power BI: Data Model, DAX Measures & Layout Specification
+## 7. Power BI: Data Model, DAX Measures & Layout Specification
 
 > **Implementation Note**: The Power BI project assets are fully designed and documented as architectural blueprints. All data modeling relationships, DAX formulas, and layout specifications are completed in `power_bi/`. A fully assembled `.pbix` file can be authored in Power BI Desktop by importing `data/exports/` and pasting the DAX measures.
 
 - **Data Model Specification**: [power_bi/data_model_spec.md](power_bi/data_model_spec.md) (Star Schema relationships, cardinalities, cross-filtering, and column definitions).
-- **DAX Formula Repository**: [power_bi/dax_measures.md](power_bi/dax_measures.md) (28 copy-paste DAX measures covering revenue, margins, repeat loyalty, and SLA metrics).
+- **DAX Formula Repository**: [power_bi/dax_measures.md](power_bi/dax_measures.md) (34 production DAX measures covering revenue, margins, repeat loyalty, and SLA metrics).
 - **Executive Layout Blueprint**: [power_bi/dashboard_layout_spec.md](power_bi/dashboard_layout_spec.md) (Canvas sizing, visual formatting, color hex codes, and 4-page report design).
-
-### [Placeholder: Power BI Dashboard Visuals]
-*(Reserved for Power BI Desktop `.pbix` report screenshots upon final local build).*
 
 ---
 
-## 7. Setup & Execution Guide
+## 8. Setup & Execution Guide
 
-### 7.1 Prerequisites
+### 8.1 Prerequisites
 - **Operating System**: Windows 10/11, macOS, or Linux.
 - **Python**: Version 3.10 or 3.11 installed.
 - **MySQL Server**: Local MySQL 8.0 running on port 3306.
 
-### 7.2 Environment Setup
+### 8.2 Environment Setup
 1. Clone the repository:
    ```powershell
    git clone https://github.com/Samk709/ecommerce-sales-customer-analytics.git
@@ -218,7 +240,7 @@ Demonstrates reactive dashboard recalculation when filtered by Customer State = 
    ```
    *(Never commit `.env` to Git; it is strictly excluded in `.gitignore`).*
 
-### 7.3 Database Setup & Data Ingestion
+### 8.3 Database Setup & Data Ingestion
 1. Place the 9 Kaggle Olist CSV files into `data/raw/`.
 2. Run data audit and cleaning pipelines:
    ```powershell
@@ -231,17 +253,17 @@ Demonstrates reactive dashboard recalculation when filtered by Customer State = 
    ```
 4. Verify database row counts match processed source files:
    ```powershell
-   python -m src.database.verify_load
+   python -m src.database.verify_db
    ```
 
-### 7.4 Running Analytics & Exporting Star Schema
+### 8.4 Running Analytics & Exporting Star Schema
 Execute the statistical analytics engine to generate RFM segments, cohort retention matrices, forecast models, and Power BI Star Schema tables:
 ```powershell
 python -m src.analysis.run_eda
 python -m src.analysis.export_powerbi_data
 ```
 
-### 7.5 Launching the Streamlit Web Application
+### 8.5 Launching the Streamlit Web Application
 Run the interactive Streamlit dashboard locally:
 ```powershell
 streamlit run streamlit_app/app.py
@@ -250,7 +272,7 @@ Open your browser to `http://localhost:8501`.
 
 ---
 
-## 8. Free Cloud Deployment (Streamlit Community Cloud)
+## 9. Free Cloud Deployment (Streamlit Community Cloud)
 
 The Streamlit web application is engineered for zero-database deployment. All data access in `streamlit_app/data_loader.py` resolves relative to `__file__`, and all dependencies are pinned in root `requirements.txt`.
 
@@ -270,7 +292,7 @@ The Streamlit web application is engineered for zero-database deployment. All da
 
 ---
 
-## 9. Automated Testing & Quality Assurance
+## 10. Automated Testing & Quality Assurance
 
 A comprehensive test suite containing **33 automated unit tests** validates end-to-end data quality, database constraints, business queries, and financial balances:
 
@@ -288,20 +310,20 @@ pytest -v tests
 
 ---
 
-## 10. Platform Limitations & Ethical Considerations
+## 11. Platform Limitations & Ethical Considerations
 
 1. **Absence of Real Cost / Wholesale Acquisition Data**:  
    The raw Olist dataset contains transactional prices and logistics freight charges, but zero supplier invoice, wholesale product cost, or merchant commission data. To model profitability, we established retail margin benchmark proxies in `config/margin_assumptions.yaml` grouped into 11 macro categories. All profit and COGS metrics are explicitly labelled **"assumed margin, not real data"**.
 2. **Fixed Historical Time Horizon (2016–2018)**:  
    The dataset covers customer orders from September 2016 through October 2018. Economic conditions, consumer behaviors, and delivery infrastructure in Brazil have evolved significantly since 2018.
 3. **High Single-Purchase Concentration (97.00%)**:  
-   97.00% of customers completed exactly one order during the 2-year window. While representative of an e-commerce marketplace specializing in durable goods (appliances, furniture, electronics), retention and repeat purchase analyses must be interpreted with this structural acquisition skew in mind.
+   97.00% of customers completed exactly one order during the 2-year window. While this may reflect an e-commerce marketplace specializing in durable goods (appliances, furniture, electronics), retention and repeat purchase analyses must be interpreted with this structural acquisition skew in mind.
 
 ---
 
-## 11. Project Documentation Index
+## 12. Project Documentation Index
 
 - **Data Dictionary**: [docs/data_dictionary.md](docs/data_dictionary.md) (Complete field definitions, relational keys, and Star Schema tables).
 - **Statistical EDA & Customer Intelligence**: [docs/eda_findings.md](docs/eda_findings.md) (Full analytical report covering RFM, cohorts, Pareto, and logistics).
-- **Business SQL Query Catalog**: [docs/sql_results.md](docs/sql_results.md) (24 queries with SQL syntax, MySQL results, and business takeaways).
+- **Business SQL Query Catalog**: [docs/sql_results.md](docs/sql_results.md) (22 queries with SQL syntax, MySQL results, and business takeaways).
 - **Career & Interview Preparation Pack**: [docs/career_pack.md](docs/career_pack.md) (Resume bullets with sources, LinkedIn launch post, and 15 technical interview Q&As).

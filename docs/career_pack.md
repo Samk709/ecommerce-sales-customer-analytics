@@ -8,7 +8,7 @@ This document equips you with battle-tested career assets for portfolio presenta
 
 Each bullet incorporates the **Action-Context-Result** framework with exact, verified project figures and explicit source attribution.
 
-- **Architected End-to-End Analytics Pipeline**: Engineered an enterprise analytics platform evaluating **96,478 delivered orders** and **R$ 13,221,498.11** in merchandise revenue (**R$ 15,419,773.75 GMV**), transitioning 9 raw datasets into a normalized MySQL 3NF database and an analytical Star Schema warehouse optimized for BI reporting.  
+- **Architected End-to-End Analytics Pipeline**: Engineered an enterprise analytics platform evaluating **96,478 delivered orders** and **R$ 13,221,498.11** in merchandise revenue (**R$ 15,419,773.75 GMV**), transitioning 9 raw datasets into a normalized MySQL relational database and an analytical Star Schema warehouse optimized for BI reporting.  
   *(Source: `docs/sql_results.md` Query 1; `data/exports/dim_orders.csv`)*
 
 - **Segmented Customer Base via Hybrid RFM Model**: Designed a hybrid discrete-quantile RFM segmentation model across **93,358 unique customers**, overcoming a severe **97.00% single-order bias** to isolate **6,929 Top Value customers** driving **R$ 2,358,970.15** (**17.84%** of revenue) with an average spend of **R$ 340.45** (**+143.6%** above platform average).  
@@ -18,7 +18,7 @@ Each bullet incorporates the **Action-Context-Result** framework with exact, ver
   *(Source: `docs/eda_findings.md` Sections 2 & 3; `data/exports/cohort_retention_matrix.csv`)*
 
 - **Analyzed Logistics SLA Impact on CSAT**: Evaluated **96,361 customer review ratings** against calendar delivery dates, identifying an immediate **2.02-star customer satisfaction cliff** upon delivery SLA breach (**4.29 on-time vs 2.27 late stars**) and modeling ongoing delay penalty at **-0.0160 stars/day late** ($p = 3.48 \times 10^{-32}$) via OLS regression.  
-  *(Source: `docs/sql_results.md` Query 5 & 13; `docs/eda_findings.md` Section 5)*
+  *(Source: `docs/sql_results.md` Query 5 & Query 8; `docs/eda_findings.md` Section 5)*
 
 - **Developed Zero-Database Web App & Production Tests**: Deployed a zero-database interactive Streamlit analytics application with reactive multi-dimensional filtering, 30-day Holt-Winters revenue forecasting (**12.90% holdout WAPE**, **R$ 4,647.90 MAE**), and built an automated **33-test pytest suite** ensuring 100% financial reconciliation across SQL, Python, and UI layers.  
   *(Source: `docs/eda_findings.md` Section 7; `tests/test_streamlit_kpis.py`)*
@@ -47,8 +47,8 @@ Delivering on-time yields an average CSAT of 4.29 / 5.0 stars. Missing the estim
 Built a 30-day additive Holt-Winters forecast capturing weekly seasonality, validated with a 12.90% WAPE on holdout test data.
 
 🛠 Tech Stack:
-• SQL (MySQL 8.0): 3NF schema, CTEs, Window Functions, Query Optimization
-• Python (Pandas, Plotly, Statsmodels): ETL, Cohort Retention, OLS Regression, Time-Series
+• SQL (MySQL 8.0): Normalized relational schema, CTEs, Window Functions, Query Optimization
+• Python (Pandas, Plotly, Statsmodels, SciPy): ETL, Cohort Retention, OLS Regression, Time-Series
 • Streamlit: Multi-page interactive executive web dashboard with zero-database cloud architecture
 • QA: 33 automated tests validating referential integrity and financial balance
 
@@ -79,9 +79,9 @@ This ensured that each line-item price contributed exactly once to revenue and e
 **Answer:**  
 "`ROW_NUMBER()` assigns a unique, sequential integer to every row regardless of ties. `RANK()` assigns identical values to ties but skips subsequent rank numbers (e.g., 1, 2, 2, 4). `DENSE_RANK()` assigns identical values to ties without skipping numbers (e.g., 1, 2, 2, 3).  
 In this project, I used window functions across several analyses:
-1. `NTILE(10) OVER (ORDER BY revenue DESC)` in Query 21 to partition customers into revenue deciles, revealing that the top 10% generated 41.10% of total platform sales.
-2. `SUM(monthly_revenue) OVER (ORDER BY year_month)` in Query 19 to compute running cumulative revenue without expensive self-joins.
-3. `ROW_NUMBER() OVER (PARTITION BY seller_id ORDER BY price DESC)` in Query 22 to isolate the top-selling product SKU per merchant."
+1. `NTILE(10) OVER (ORDER BY total_spend DESC)` in Query 21 to partition customers into revenue deciles, revealing that the top 10% generated 41.10% of total platform sales.
+2. `SUM(monthly_revenue) OVER (ORDER BY order_month)` in Query 18 to compute running cumulative revenue without expensive self-joins.
+3. `DENSE_RANK() OVER (PARTITION BY category_group ORDER BY revenue DESC)` in Query 19 to identify the top 3 best-selling product categories within each macro sector."
 
 #### Q3: Why did you filter strictly for `order_status = 'delivered'` in revenue calculations, and how did you handle freight?
 **Answer:**  
@@ -93,9 +93,9 @@ Regarding freight, merchandise revenue is strictly `SUM(price)`, whereas Gross M
 "When joining `dim_orders`, `fact_order_items`, and `dim_customers`, initial query plans required full table scans on `fact_order_items` (112k rows) and temporary tables with filesort on customer groupings.  
 I created targeted B-tree indexes:
 1. Composite foreign key index on `fact_order_items(order_id, product_id)`.
-2. Covering index on `dim_orders(order_status, order_purchase_timestamp, customer_id)`.
+2. Composite index on `dim_orders(order_status, order_purchase_timestamp, customer_id)`.
 3. Lookup index on `dim_customers(customer_unique_id)`.  
-Running `EXPLAIN` on Query 13 (late delivery classification) before indexing showed `type: ALL` on orders. After adding the covering index, `EXPLAIN` confirmed `type: ref`, `key: idx_orders_status_date`, scanning only the 96,478 delivered rows directly from the index tree without loading unindexed columns into temporary memory, reducing execution time by over 75%."
+Running `EXPLAIN` on Query 13 (late delivery classification) before indexing showed `type: ALL` on orders. After adding the composite index, `EXPLAIN` confirmed `type: ref`, `key: idx_orders_status_date`, scanning only the 96,478 delivered rows directly from the index tree without loading unindexed columns into temporary memory, reducing execution time by over 75%."
 
 ---
 
@@ -103,7 +103,7 @@ Running `EXPLAIN` on Query 13 (late delivery classification) before indexing sho
 
 #### Q5: Explain the architectural differences between your MySQL relational schema and your Power BI Star Schema.
 **Answer:**  
-"The MySQL operational schema is normalized to Third Normal Form (3NF) across 9 tables. Its objective is transactional integrity, eliminating update anomalies and minimizing data redundancy (e.g., separating `dim_category_translation` from `dim_products`, and separating `dim_customers` from `dim_orders`).  
+"The MySQL operational schema is a normalized relational schema across 9 tables. Its objective is transactional integrity, eliminating update anomalies and minimizing data redundancy (e.g., separating `dim_category_translation` from `dim_products`, and separating `dim_customers` from `dim_orders`).  
 Conversely, the Power BI analytical warehouse in `data/exports/` is modeled as a Kimball Star Schema with 1 centralized fact table (`fact_order_items`), 4 direct dimensional tables (`dim_orders`, `dim_customers`, `dim_products`, `dim_date`), and 3 secondary tables. In the Star Schema, we intentionally denormalized category English translations, benchmark margin rates, and customer repeat flags directly into dimensions. This minimizes join depth (1-to-many single-hop relationships), eliminates bidirectional relationship ambiguity, and optimizes VertiPaq columnar compression in Power BI."
 
 #### Q6: How did you handle the dual customer key problem (`customer_id` vs `customer_unique_id`)?

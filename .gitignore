@@ -9,10 +9,10 @@ ENV/
 *.env
 !.env.example
 
-# Data Files (Raw Kaggle downloads and generated CSV dumps)
+# Data Files (Raw Kaggle downloads and intermediate processed dumps)
 data/raw/
 data/processed/*.csv
-data/exports/*.csv
+# data/exports/ CSVs are tracked to support standalone cloud deployment (Streamlit Community Cloud)
 
 # Python artifacts
 __pycache__/
