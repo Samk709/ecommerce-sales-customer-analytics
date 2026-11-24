@@ -101,9 +101,17 @@ def export_orders_dimension(engine):
     df["is_delayed"] = df["delivery_delay_days"].apply(lambda d: 1 if d > 0 else (0 if pd.notna(d) else np.nan))
     
     # Delivery Lead Times (purchase to delivery) in decimal days
-    df["delivery_lead_time_days"] = (df["order_delivered_customer_date"] - df["order_purchase_timestamp"]).dt.total_seconds() / 86400.0
+    df["delivery_lead_time_days"] = ((df["order_delivered_customer_date"] - df["order_purchase_timestamp"]).dt.total_seconds() / 86400.0).round(2)
     # Carrier Transit Time (carrier dispatch to customer delivery) in decimal days
-    df["carrier_transit_time_days"] = (df["order_delivered_customer_date"] - df["order_delivered_carrier_date"]).dt.total_seconds() / 86400.0
+    df["carrier_transit_time_days"] = ((df["order_delivered_customer_date"] - df["order_delivered_carrier_date"]).dt.total_seconds() / 86400.0).round(2)
+
+    # Keep essential analytical columns (optimized slim schema for zero-database deployment)
+    cols = [
+        "order_id", "customer_id", "order_status", "order_purchase_date",
+        "order_delivered_customer_date_only", "order_estimated_delivery_date_only",
+        "delivery_delay_days", "is_delayed", "delivery_lead_time_days", "carrier_transit_time_days"
+    ]
+    df = df[cols]
 
     out_path = os.path.join(EXPORTS_DIR, "dim_orders.csv")
     df.to_csv(out_path, index=False)
@@ -145,6 +153,9 @@ def export_customers_dimension(engine):
         df["rfm_segment"] = "Unsegmented"
         df["is_repeat_customer"] = 0
 
+    # Keep essential analytical columns (optimized slim schema for zero-database deployment)
+    df = df[["customer_id", "customer_unique_id", "customer_state", "rfm_segment", "is_repeat_customer"]]
+
     out_path = os.path.join(EXPORTS_DIR, "dim_customers.csv")
     df.to_csv(out_path, index=False)
     logger.info(f"Exported dim_customers.csv ({len(df):,} rows) -> {out_path}")
@@ -155,16 +166,8 @@ def export_products_dimension(engine):
     query = """
     SELECT 
         product_id,
-        product_category_name,
         product_category_name_english,
         category_group,
-        product_name_lenght AS product_name_length,
-        product_description_lenght AS product_description_length,
-        product_photos_qty,
-        product_weight_g,
-        product_length_cm,
-        product_height_cm,
-        product_width_cm,
         assumed_cogs_rate,
         assumed_gross_margin_rate
     FROM dim_products;
@@ -199,14 +202,10 @@ def export_fact_order_items(engine):
         i.order_item_id,
         i.product_id,
         i.seller_id,
-        i.shipping_limit_date,
         i.price,
         i.freight_value,
-        p.assumed_cogs_rate,
-        p.assumed_gross_margin_rate,
         (i.price * p.assumed_cogs_rate) AS assumed_cogs_brl,
-        (i.price * p.assumed_gross_margin_rate) AS assumed_gross_profit_brl,
-        ROUND(i.price + i.freight_value, 2) AS total_item_value_brl
+        (i.price * p.assumed_gross_margin_rate) AS assumed_gross_profit_brl
     FROM fact_order_items i
     JOIN dim_products p ON i.product_id = p.product_id;
     """
@@ -239,9 +238,7 @@ def export_fact_order_reviews(engine):
     SELECT 
         review_id,
         order_id,
-        review_score,
-        review_creation_date,
-        review_answer_timestamp
+        review_score
     FROM fact_order_reviews;
     """
     df = pd.read_sql(query, engine)

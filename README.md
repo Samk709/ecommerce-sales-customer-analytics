@@ -42,7 +42,7 @@ flowchart TD
     end
 
     subgraph Quality["5. Automated Pytest Validation"]
-        Q["Pytest Test Suite (33 Tests)\n(Referential, Financial, Logic Validation)"] -.-> D
+        Q["Pytest Test Suite (39 Tests)\n(Referential, Financial, Logic Validation)"] -.-> D
         Q -.-> N
         Q -.-> O
     end
@@ -91,7 +91,7 @@ flowchart TD
 │   ├── data_loader.py                 # Relative path cached CSV loader (@st.cache_data)
 │   ├── components.py                  # Custom CSS styling and HTML KPI cards
 │   └── views/                         # 5 report view modules (Overview, Products, Customers, Delivery, Forecast)
-├── tests/                             # Pytest automated test suite (33 passing tests)
+├── tests/                             # Pytest automated test suite (39 passing tests)
 ├── requirements.txt                   # Production pinned dependencies
 ├── .env.example                       # Secure environment configuration template
 └── README.md                          # Platform master documentation
@@ -110,7 +110,7 @@ flowchart TD
 | **Data Visualization** | **Plotly, Matplotlib, Seaborn** | Interactive UI charts, publication-ready statistical plots |
 | **Web Application** | **Streamlit** (v1.65.0) | Multi-page executive dashboard with zero-database cloud architecture |
 | **Business Intelligence** | **Power BI Desktop** (Specification) | Star Schema data model, 34 DAX measures, executive layout specs |
-| **Quality Assurance** | **Pytest** | 33 automated tests validating referential integrity and financial balance |
+| **Quality Assurance** | **Pytest** | 39 automated tests validating referential integrity and financial balance |
 | **Version Control** | **Git, GitHub** | Source tracking, semantic commits, cloud deployment trigger |
 
 ---
@@ -144,20 +144,20 @@ Every metric below is extracted directly from script executions and project logs
 Based on empirical data across the SQL warehouse and Python analytics pipelines, we prioritize four strategic business recommendations:
 
 1. **Mitigate Fulfillment SLA Breaches to Protect Brand Equity**:  
-   - **Data & Source**: On-time deliveries average **4.29 stars**, while delayed deliveries trigger an immediate **2.02-star drop to 2.27 stars** (`docs/sql_results.md` Query 8; `docs/eda_findings.md` Section 5), with CSAT eroding further at **-0.0160 stars per additional day late**. **7.23% (6,985 orders)** breached SLA (`docs/sql_results.md` Query 13).  
-   - **Action**: Dynamically extend estimated delivery promises by +2 business days for inter-state transit corridors and trigger proactive automated Day-1 breach notifications with R$ 15 shipping vouchers before reviews are submitted.
+   - **Data & Source**: On-time deliveries maintain an average CSAT of **4.29 stars** (89,944 reviews), whereas late deliveries suffer an immediate **2.02-star cliff down to 2.27 stars** (6,409 reviews with 62.41% 1–2 star detractors; `docs/sql_results.md` Query 8; `docs/eda_findings.md` Section 5). CSAT continues to erode at **-0.0160 stars per additional day late** via late-order OLS regression (`docs/eda_findings.md` Section 5). Overall, **6,534 delivered orders (6.77% of 96,470 evaluated orders)** breached their carrier estimated delivery date (`docs/sql_results.md` Query 13).  
+   - **Action**: Dynamically extend customer-facing delivery estimates by +2 business days on long-haul transit corridors to eliminate minor 1–3 day SLA breaches (1,870 orders; `docs/sql_results.md` Query 13), and deploy automated Day-1 breach notifications with R$ 15 freight credits to reduce detractor review submission.
 
 2. **Drive Targeted Re-Engagement Campaigns to Capture the Repeat Buyer CLV Premium**:  
-   - **Data & Source**: Only **3.00% (2,801 customers)** make repeat purchases, yet repeat buyers generate an **+88.5% CLV premium** (**R$ 260.05 vs R$ 137.96**; `docs/eda_findings.md` Section 3). Average repurchase latency is **41.48 days** (`docs/sql_results.md` Query 20).  
-   - **Action**: Implement personalized lifecycle email campaigns at days 30–45 post-delivery targeting the **6,929 Top Value** RFM segment (`data/exports/rfm_segment_summary.csv`), who currently generate **17.84% (R$ 2,358,970.15)** of total platform revenue.
+   - **Data & Source**: Only **3.00% of customers (2,801 individuals)** purchase $\ge 2$ times, yet repeat customers generate an **+88.5% CLV premium** (**R$ 260.05 vs R$ 137.96**; `docs/sql_results.md` Query 11; `docs/eda_findings.md` Section 3). The average purchase latency between successive repeat orders is **79.10 days** across 3,120 reorder events (`docs/sql_results.md` Query 20). The **6,929 Top Value** RFM segment currently drives **17.84% (R$ 2,358,970.15)** of total merchandise revenue with an average spend of **R$ 340.45** (`docs/eda_findings.md` Section 1; `data/exports/rfm_segment_summary.csv`).  
+   - **Action**: Implement automated post-purchase email and SMS re-engagement sequences timed at days 60–80 (preceding the 79.10-day reorder cycle) targeting Top Value buyers with personalized recommendations to cultivate repeat purchasing.
 
 3. **Expand High-Margin Consumable Categories to Offset Durable Churn**:  
-   - **Data & Source**: Month-1 cohort retention averages only **0.47%** (`docs/eda_findings.md` Section 2; `data/exports/cohort_retention_matrix.csv`), reflecting marketplace skew toward one-time durable goods. Categories like Health & Beauty generate **R$ 1,258,836.12** in merchandise revenue at a **45.0% assumed gross margin** (`docs/sql_results.md` Query 14; `config/margin_assumptions.yaml`).  
-   - **Action**: Incentivize onboarding of consumable and replenishment merchants (beauty, wellness, pet care) with lower seller take-rates to cultivate high-frequency purchasing habits.
+   - **Data & Source**: Average Month-1 repurchase retention is only **0.47%** across 2017 monthly cohorts (`docs/eda_findings.md` Section 2; `data/exports/cohort_retention_matrix.csv`), reflecting marketplace reliance on one-time durable goods. The top individual product category, `health_beauty`, generates **R$ 1,233,131.72** across 9,465 sold units (`docs/sql_results.md` Query 6), and the broader `Beauty & Personal Care` macro sector yields **R$ 1,624,777.16** in revenue and **R$ 812,388.58** in gross profit at a **50.00% assumed gross margin** (`docs/sql_results.md` Query 14; `config/margin_assumptions.yaml`).  
+   - **Action**: Incentivize onboarding of consumable and replenishment merchants across personal care, beauty, and pet supplies with reduced platform take-rates to build high-frequency replenishment habits.
 
 4. **Restructure Logistics Subsidies for High-Freight Bulky Sectors**:  
-   - **Data & Source**: Shipping freight represents **14.26% (R$ 2,198,275.64)** of platform GMV (`docs/sql_results.md` Query 1), but surges to **20.88% (R$ 152,065.73)** in Construction & Tools and **20.83% (R$ 254,498.42)** in Furniture (`docs/sql_results.md` Query 9).  
-   - **Action**: Negotiate contracted volume freight discounts with regional carriers and test tiered free-shipping thresholds above R$ 200 on bulky goods to reduce checkout funnel abandonment.
+   - **Data & Source**: Across all delivered orders, logistics freight averages **16.63% of merchandise price** (**R$ 2,198,275.64 freight** on **R$ 13,221,498.11 item revenue**; `docs/sql_results.md` Query 1; representing **14.26% of GMV** R$ 15,419,773.75). The freight-to-price ratio surges significantly above platform average in heavy/bulky sectors: **22.17% (R$ 623,981.57 freight)** in Furniture & Home Decor and **18.31% (R$ 148,977.54 freight)** in Tools & Construction (`docs/sql_results.md` Query 9).  
+   - **Action**: Negotiate contracted volume freight discounts with regional carriers and introduce tiered free-shipping thresholds above R$ 200 on bulky goods to reduce checkout cart abandonment where shipping costs exceed 20% of item price.
 
 ---
 
@@ -294,7 +294,7 @@ The Streamlit web application is engineered for zero-database deployment. All da
 
 ## 10. Automated Testing & Quality Assurance
 
-A comprehensive test suite containing **33 automated unit tests** validates end-to-end data quality, database constraints, business queries, and financial balances:
+A comprehensive test suite containing **39 automated unit tests** validates end-to-end data quality, database constraints, business queries, and financial balances:
 
 ```powershell
 pytest -v tests
@@ -307,6 +307,7 @@ pytest -v tests
 - `tests/test_eda.py`: RFM customer and revenue balances, cohort bounds, Pareto distributions, and holdout WAPE validation (7 tests).
 - `tests/test_powerbi_exports.py`: Star Schema row counts, referential integrity, and financial totals (5 tests).
 - `tests/test_streamlit_kpis.py`: Standalone verification that unfiltered baseline KPIs match exact platform numbers (3 tests).
+- `tests/test_readme_reconciliation.py`: End-to-end validation of all published headline numbers and claims against exported data (6 tests).
 
 ---
 

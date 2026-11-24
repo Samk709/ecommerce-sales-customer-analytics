@@ -11,7 +11,7 @@ Each bullet incorporates the **Action-Context-Result** framework with exact, ver
 - **Architected End-to-End Analytics Pipeline**: Engineered an enterprise analytics platform evaluating **96,478 delivered orders** and **R$ 13,221,498.11** in merchandise revenue (**R$ 15,419,773.75 GMV**), transitioning 9 raw datasets into a normalized MySQL relational database and an analytical Star Schema warehouse optimized for BI reporting.  
   *(Source: `docs/sql_results.md` Query 1; `data/exports/dim_orders.csv`)*
 
-- **Segmented Customer Base via Hybrid RFM Model**: Designed a hybrid discrete-quantile RFM segmentation model across **93,358 unique customers**, overcoming a severe **97.00% single-order bias** to isolate **6,929 Top Value customers** driving **R$ 2,358,970.15** (**17.84%** of revenue) with an average spend of **R$ 340.45** (**+143.6%** above platform average).  
+- **Segmented Customer Base via Hybrid RFM Model**: Designed a hybrid discrete-quantile RFM segmentation model across **93,358 unique customers**, overcoming a severe **97.00% single-order bias** to isolate **6,929 Top Value customers** driving **R$ 2,358,970.15** (**17.84%** of revenue) with an average spend of **R$ 340.45** (**+140.4%** above platform average of R$ 141.62).  
   *(Source: `docs/eda_findings.md` Section 1; `data/exports/rfm_segment_summary.csv`)*
 
 - **Quantified Customer Retention & Unit Economics**: Modeled historical Customer Lifetime Value (CLV) proving repeat customers (**2,801 users**, **3.00%** of customer base) generate an **+88.5% CLV premium** (**R$ 260.05 vs R$ 137.96**), while diagnosing monthly cohort retention across 2017 to reveal a **0.47% Month-1 retention rate**, shifting commercial strategy from acquisition to retention.  
@@ -20,7 +20,7 @@ Each bullet incorporates the **Action-Context-Result** framework with exact, ver
 - **Analyzed Logistics SLA Impact on CSAT**: Evaluated **96,361 customer review ratings** against calendar delivery dates, identifying an immediate **2.02-star customer satisfaction cliff** upon delivery SLA breach (**4.29 on-time vs 2.27 late stars**) and modeling ongoing delay penalty at **-0.0160 stars/day late** ($p = 3.48 \times 10^{-32}$) via OLS regression.  
   *(Source: `docs/sql_results.md` Query 5 & Query 8; `docs/eda_findings.md` Section 5)*
 
-- **Developed Zero-Database Web App & Production Tests**: Deployed a zero-database interactive Streamlit analytics application with reactive multi-dimensional filtering, 30-day Holt-Winters revenue forecasting (**12.90% holdout WAPE**, **R$ 4,647.90 MAE**), and built an automated **33-test pytest suite** ensuring 100% financial reconciliation across SQL, Python, and UI layers.  
+- **Developed Zero-Database Web App & Production Tests**: Deployed a zero-database interactive Streamlit analytics application with reactive multi-dimensional filtering, 30-day Holt-Winters revenue forecasting (**12.90% holdout WAPE**, **R$ 4,647.90 MAE**), and built an automated **39-test pytest suite** ensuring 100% financial reconciliation across SQL, Python, and UI layers.  
   *(Source: `docs/eda_findings.md` Section 7; `tests/test_streamlit_kpis.py`)*
 
 ---
@@ -50,7 +50,7 @@ Built a 30-day additive Holt-Winters forecast capturing weekly seasonality, vali
 • SQL (MySQL 8.0): Normalized relational schema, CTEs, Window Functions, Query Optimization
 • Python (Pandas, Plotly, Statsmodels, SciPy): ETL, Cohort Retention, OLS Regression, Time-Series
 • Streamlit: Multi-page interactive executive web dashboard with zero-database cloud architecture
-• QA: 33 automated tests validating referential integrity and financial balance
+• QA: 39 automated tests validating referential integrity and financial balance
 
 🔗 Check out the full GitHub repository, SQL queries, and interactive dashboard code:
 https://github.com/Samk709/ecommerce-sales-customer-analytics
@@ -114,13 +114,13 @@ To resolve this, Olist provides `customer_unique_id`, which represents the actua
 - `customer_unique_id` is the analytical entity key for all customer intelligence, RFM segmentation, cohort retention, and CLV calculations.
 This distinction revealed that there are 93,358 unique people across 99,441 customer orders, with 2,801 individuals purchasing multiple times."
 
-#### Q7: Why did you create a dedicated Date Dimension (`dim_date`), and why is it preferred over raw timestamp columns in BI tools?
+#### Q7: Why did you create a dedicated Date Dimension (`dim_calendar`), and why is it preferred over raw timestamp columns in BI tools?
 **Answer:**  
 "Raw timestamp fields contain irregular, continuous timestamps (e.g., `2018-05-09 17:35:12`). In BI tools like Power BI, slicing directly on raw timestamps causes three major issues:
 1. High cardinality destroys VertiPaq columnar compression efficiency.
 2. Days with zero sales create discontinuous gaps that break DAX time-intelligence functions (`TOTALYTD`, `SAMEPERIODLASTYEAR`, `DATEADD`).
 3. Slicing by fiscal quarters, day of week, or month names requires runtime calculations on millions of rows.  
-By generating a dedicated, contiguous `dim_date` (773 rows covering 2016-09-01 to 2018-10-17) marked as the official Date Table, time-intelligence DAX functions compute deterministically, calendar hierarchies drill smoothly, and zero-sales days are accurately preserved in visualizations."
+By generating a dedicated, contiguous `dim_calendar` (1,096 rows covering 2016-01-01 to 2018-12-31) marked as the official Date Table, time-intelligence DAX functions compute deterministically, calendar hierarchies drill smoothly, and zero-sales days are accurately preserved in visualizations."
 
 ---
 
@@ -181,11 +181,12 @@ Instead, I decoupled analytics delivery from the database:
 
 #### Q15: How did you ensure data quality and financial reconciliation across your pipeline?
 **Answer:**  
-"I developed an automated 33-test suite in `pytest` organized into 6 test modules:
+"I developed an automated 39-test suite in `pytest` organized into 7 test modules:
 1. `test_data_quality.py`: Verifies primary key uniqueness, non-null constraints, price/freight non-negativity, and coordinate bounds.
 2. `test_db_connection.py`: Validates MySQL 8.0 connectivity and verifies schema table creation.
 3. `test_sql_queries.py`: Reconciles business queries against mathematical balances (e.g., running cumulative sales equal grand total; Q14 COGS + Gross Profit equal Merchandise Revenue R$ 13,221,498.11; Q5 reviews sum to 96,361).
 4. `test_eda.py`: Confirms RFM segment customer counts sum to 93,358 and revenue sums to R$ 13,221,498.11; confirms holdout WAPE matches 12.90%.
 5. `test_powerbi_exports.py`: Validates Star Schema row counts, referential integrity between dimensions and facts, and financial reconciliation.
 6. `test_streamlit_kpis.py`: Ensures the Streamlit calculation engine reproduces the exact baseline figures (R$ 13,221,498.11 revenue, 96,478 orders, 2,801 repeat buyers) with zero filters and sub-filters accurately.  
+7. `test_readme_reconciliation.py`: End-to-end automated assertions confirming all published metrics in the README and career pack match export CSVs and underlying statistical models.  
 This continuous testing guarantees that numbers presented to executive stakeholders are mathematically infallible."

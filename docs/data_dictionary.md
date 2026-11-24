@@ -145,31 +145,34 @@ The dimensional warehouse deployed in `data/exports/` optimizes query performanc
 
 ### 2.1 `dim_orders.csv`
 - **Grain**: 1 row per order (99,441 rows).
+- **Columns**: `order_id`, `customer_id`, `order_status`, `order_purchase_date`, `order_delivered_customer_date_only`, `order_estimated_delivery_date_only`, `delivery_delay_days`, `is_delayed`, `delivery_lead_time_days`, `carrier_transit_time_days`.
 - **Enriched Attributes**:
   - `delivery_delay_days`: Strict calendar day variance `DATEDIFF(order_delivered_customer_date, order_estimated_delivery_date)`. Positive values indicate SLA delivery delay; zero or negative values indicate on-time fulfillment.
   - `is_delayed`: Binary logistics SLA breach flag (`1` if `delivery_delay_days > 0`, else `0`).
-  - `delay_tier`: Stratified fulfillment categorization (`On-Time / Early`, `Minor Delay (1-3d)`, `Moderate Delay (4-7d)`, `High Delay (8-14d)`, `Severe Delay (15+d)`).
+  - `delivery_lead_time_days`: Total duration from purchase timestamp to customer doorstep delivery in decimal days.
+  - `carrier_transit_time_days`: Duration from carrier dispatch to customer delivery in decimal days.
 
 ### 2.2 `dim_customers.csv`
 - **Grain**: 1 row per transactional `customer_id` (99,441 rows; 93,358 unique people).
+- **Columns**: `customer_id`, `customer_unique_id`, `customer_state`, `rfm_segment`, `is_repeat_customer`.
 - **Enriched Attributes**:
-  - `customer_order_count`: Total lifetime delivered orders completed by this `customer_unique_id`.
-  - `is_repeat_customer`: Binary loyalty indicator (`1` if `customer_order_count >= 2`, else `0`).
+  - `is_repeat_customer`: Binary loyalty indicator (`1` if unique customer completed $\ge 2$ delivered orders, else `0`).
   - `rfm_segment`: Segment classification (`Top Value`, `Mid Value`, `Dormant`, `Low Spend`).
 
 ### 2.3 `dim_products.csv`
 - **Grain**: 1 row per product SKU (32,951 rows).
-- **Enriched Attributes**: Standardized column aliases `product_name_length` and `product_description_length` with benchmark `category_group`, `assumed_cogs_rate`, and `assumed_gross_margin_rate`.
+- **Columns**: `product_id`, `product_category_name_english`, `category_group`, `assumed_cogs_rate`, `assumed_gross_margin_rate`.
 
 ### 2.4 `fact_order_items.csv`
 - **Grain**: 1 row per ordered item line (112,650 rows).
+- **Columns**: `order_id`, `order_item_id`, `product_id`, `seller_id`, `price`, `freight_value`, `assumed_cogs_brl`, `assumed_gross_profit_brl`.
 - **Enriched Attributes**:
-  - `cogs`: Assumed Cost of Goods Sold `price * assumed_cogs_rate` (*assumed margin, not real data*).
-  - `gross_profit`: Assumed gross margin contribution `price - cogs` (*assumed margin, not real data*).
+  - `assumed_cogs_brl`: Assumed Cost of Goods Sold `price * assumed_cogs_rate` (*assumed margin, not real data*).
+  - `assumed_gross_profit_brl`: Assumed gross margin contribution `price * assumed_gross_margin_rate` (*assumed margin, not real data*).
 
-### 2.5 `dim_date.csv`
-- **Grain**: 1 row per calendar day (773 rows covering 2016-09-01 to 2018-10-17).
-- **Attributes**: `date_key`, `full_date`, `year`, `quarter`, `month`, `month_name`, `day`, `day_of_week`, `day_name`, `is_weekend`, `year_month`, `year_quarter`.
+### 2.5 `dim_calendar.csv`
+- **Grain**: 1 row per calendar day (1,096 rows covering 2016-01-01 to 2018-12-31).
+- **Columns**: `date_key`, `Date`, `Year`, `Quarter`, `QuarterName`, `Month`, `MonthName`, `MonthShort`, `YearMonth`, `YearMonthInt`, `WeekNumber`, `DayOfWeek`, `DayName`, `IsWeekend`.
 
 ---
 
