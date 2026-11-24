@@ -24,7 +24,7 @@ if ROOT_DIR not in sys.path:
 
 import streamlit as st
 import datetime
-from streamlit_app.components import inject_custom_css
+from streamlit_app.components import inject_custom_css, render_header, render_footer
 from streamlit_app.data_loader import load_core_dimensions
 from streamlit_app.kpi_metrics import filter_dataset
 from streamlit_app.views.overview import render_overview_view
@@ -44,15 +44,16 @@ st.set_page_config(
 # 2. Inject Custom Corporate Theme CSS
 inject_custom_css()
 
-# 3. Load Core Data
-orders_df, items_df, customers_df, products_df = load_core_dimensions()
+# 3. Load Core Data with Subtle Loading Feedback
+with st.spinner("Loading analytical data..."):
+    orders_df, items_df, customers_df, products_df = load_core_dimensions()
 
 # 4. Sidebar Controls & Multi-Dimensional Filters
 st.sidebar.markdown(
     """
-    <div style="padding: 10px 0 20px 0;">
-        <h2 style="color: #1B2A4A; margin: 0; font-size: 1.35rem; font-weight: 800;">🛒 Olist Analytics</h2>
-        <span style="color: #64748B; font-size: 0.80rem; font-weight: 600;">E-Commerce Executive Intelligence</span>
+    <div style="padding: 10px 0 16px 0;">
+        <h2 style="color: #1B2A4A; margin: 0; font-size: 1.30rem; font-weight: 800;">🛒 Olist Analytics</h2>
+        <span style="color: #64748B; font-size: 0.78rem; font-weight: 600;">Executive Intelligence & Strategy</span>
     </div>
     """,
     unsafe_allow_html=True
@@ -141,7 +142,7 @@ if st.sidebar.button("🔄 Reset All Filters", use_container_width=True):
     st.rerun()
 
 st.sidebar.markdown("---")
-st.sidebar.caption("Portfolio Project: E-Commerce Analytics Platform | Stack: Python, MySQL 8.0, Power BI, Streamlit")
+st.sidebar.caption("E-Commerce Analytics Platform | Stack: Python, MySQL 8.0, Power BI, Streamlit")
 
 # 5. Apply Filtering Engine
 is_filtered = not (
@@ -164,7 +165,17 @@ f_orders, f_items, f_cust, f_prod = filter_dataset(
     selected_rfm=selected_rfm if len(selected_rfm) < len(all_rfm) else None
 )
 
-# 6. Page Routing
+# 6. Render Executive Top Header
+subtitle_map = {
+    "🏠 Executive Overview": "Executive Sales & Commercial Performance Overview",
+    "📦 Products & Categories": "Catalog Margin Analysis & 80/20 Pareto Distribution",
+    "👥 Customers & Retention": "Customer Loyalty Economics, RFM Segments & Cohort Decay",
+    "🚚 Logistics SLA & CSAT": "Fulfillment Lead Time, SLA Breach Penalty & Review Ratings",
+    "📈 Sales Forecast": "Time-Series Cyclicality & 30-Day Forward Sales Projection"
+}
+render_header(subtitle=subtitle_map.get(nav_selection, "Executive Sales & Customer Intelligence Analytics Platform"))
+
+# 7. Page Routing
 if nav_selection == "🏠 Executive Overview":
     render_overview_view(f_orders, f_items, f_cust, is_filtered)
 elif nav_selection == "📦 Products & Categories":
@@ -175,3 +186,6 @@ elif nav_selection == "🚚 Logistics SLA & CSAT":
     render_delivery_view(f_orders)
 elif nav_selection == "📈 Sales Forecast":
     render_forecast_view()
+
+# 8. Render Executive Footer
+render_footer()
