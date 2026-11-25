@@ -174,6 +174,36 @@ The dimensional warehouse deployed in `data/exports/` optimizes query performanc
 - **Grain**: 1 row per calendar day (1,096 rows covering 2016-01-01 to 2018-12-31).
 - **Columns**: `date_key`, `Date`, `Year`, `Quarter`, `QuarterName`, `Month`, `MonthName`, `MonthShort`, `YearMonth`, `YearMonthInt`, `WeekNumber`, `DayOfWeek`, `DayName`, `IsWeekend`.
 
+### 2.6 High-Performance Streamlit Parquet Warehouse & Pre-Aggregated Summaries (`src/analysis/generate_app_data.py`)
+To enable sub-second page switches and minimal memory consumption on Streamlit Community Cloud (< 500 MB RAM limit), the script `src/analysis/generate_app_data.py` compiles raw CSV exports into optimized Apache Parquet tables with compact categorical and integer dtypes:
+
+1. **Core Columnar Dimensions**:
+   - `dim_orders.parquet`: `order_id`, `customer_id`, `order_status`, `order_purchase_date`, `delivery_delay_days`, `is_delayed`, `delivery_lead_time_days`, `purchase_year_month` (99,441 rows, 6.69 MB).
+   - `fact_order_items.parquet`: `order_id`, `product_id`, `price`, `freight_value`, `assumed_cogs_brl`, `assumed_gross_profit_brl` (112,650 rows, 5.23 MB).
+   - `dim_customers.parquet`: `customer_id`, `customer_unique_id`, `customer_state`, `rfm_segment`, `is_repeat_customer` (99,441 rows, 6.28 MB).
+   - `dim_products.parquet`: `product_id`, `product_category_name_english`, `category_group` (32,951 rows, 1.09 MB).
+   - `fact_order_reviews.parquet`: `order_id`, `review_score` (99,224 rows, 3.21 MB).
+
+2. **Pre-Aggregated Fast-Path Analytical Summaries**:
+   - `baseline_kpis.parquet`: Headline platform metrics computed directly from full delivered transactions for instant unfiltered dashboard load without hardcoded numbers.
+   - `overview_monthly_trend.parquet`: Pre-computed monthly revenue and MoM growth rate table (`Month`, `Revenue`, `prev_revenue`, `MoM_Growth_Pct`).
+   - `overview_state_summary.parquet`: State-level revenue and order concentration (`customer_state`, `Revenue`, `order_count`, `share_pct`).
+   - `products_category_summary.parquet`: Macro category financial breakdown (`category_group`, `total_revenue_brl`, `order_count`, `assumed_gross_profit_brl`, `units_sold`, `blended_gross_margin_pct`, `share_pct`).
+   - `products_top20_summary.parquet`: Top 20 best-selling SKUs by gross revenue (`product_id`, `product_category_name_english`, `category_group`, `units_sold`, `total_revenue`, `assumed_gross_profit`).
+   - `delivery_delay_daily.parquet`: Aggregated daily mean CSAT rating for late orders $\le 60$ days with $n \ge 20$ reviews (`delivery_delay_days`, `avg_review_score`, `review_count`).
+   - `lead_time_distribution.parquet`: Delivery lead time histogram bins from 1 to 60 days (`lead_time_days`, `order_count`).
+   - `rfm_segment_summary.parquet`: RFM customer segment strategic matrix (`segment`, `customer_count`, `customer_pct`, `repeat_customers`, `repeat_buyer_pct`, `total_revenue_brl`, `revenue_pct`, `avg_recency_days`, `avg_frequency`, `avg_spend_brl`).
+
+> **Pipeline Execution Order**:
+> 1. `python -m src.preprocessing.audit`
+> 2. `python -m src.preprocessing.clean_data`
+> 3. `python -m src.database.load_data`
+> 4. `python -m src.database.verify_db`
+> 5. `python -m src.analysis.run_eda`
+> 6. `python -m src.analysis.export_powerbi_data`
+> 7. `python -m src.analysis.generate_app_data`
+> 8. `streamlit run streamlit_app/app.py`
+
 ---
 
 ## 3. Financial & Benchmark Margin Assumptions (`config/margin_assumptions.yaml`)

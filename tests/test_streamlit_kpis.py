@@ -9,7 +9,12 @@ Verifies that the standalone KPI calculation engine reproduces the exact platfor
 import os
 import pytest
 import pandas as pd
-from streamlit_app.kpi_metrics import compute_overview_kpis, filter_dataset
+from streamlit_app.kpi_metrics import (
+    compute_overview_kpis,
+    filter_dataset,
+    compute_baseline_kpis_from_tables,
+    BASELINE_KPIS
+)
 
 EXPORTS_DIR = "data/exports"
 
@@ -95,3 +100,31 @@ def test_rfm_segment_filter_logic(dataset):
     
     assert kpis_top["repeat_customers_count"] == 1549
     assert abs(kpis_top["total_revenue_brl"] - 2358970.15) <= 1.0
+
+def test_baseline_kpis_recomputed_from_full_tables(dataset):
+    """
+    Verify that BASELINE_KPIS values are dynamically computed from data (not typed into code):
+    Recomputes all metrics from raw full tables and checks that every single
+    value matches BASELINE_KPIS and the verified platform figures.
+    """
+    orders_df, items_df, customers_df, _ = dataset
+    recomputed = compute_baseline_kpis_from_tables(orders_df, items_df, customers_df)
+    
+    # Assert every key in recomputed matches BASELINE_KPIS exactly
+    for key, val in recomputed.items():
+        assert key in BASELINE_KPIS, f"Key {key} missing from BASELINE_KPIS"
+        assert val == BASELINE_KPIS[key], f"Mismatch for {key}: recomputed {val} vs BASELINE_KPIS {BASELINE_KPIS[key]}"
+    
+    # Assert exact verified values
+    assert recomputed["total_revenue_brl"] == 13221498.11
+    assert recomputed["total_delivered_orders"] == 96478
+    assert recomputed["repeat_customers_count"] == 2801
+    assert recomputed["aov_brl"] == 137.04
+    assert recomputed["total_freight_brl"] == 2198275.64
+    assert recomputed["gmv_brl"] == 15419773.75
+    assert recomputed["assumed_cogs_brl"] == 7832679.13
+    assert recomputed["assumed_gross_profit_brl"] == 5388818.98
+    assert recomputed["blended_gross_margin_pct"] == 40.76
+    assert recomputed["total_unique_customers"] == 93358
+    assert recomputed["repeat_customer_rate_pct"] == 3.00
+    assert recomputed["total_items_sold"] == 110197

@@ -25,6 +25,12 @@ from streamlit_app.components import (
 )
 from streamlit_app.data_loader import load_cohort_retention, load_rfm_summary
 
+CUSTOMERS_SECTIONS = [
+    "👥 RFM Customer Segments & Frequency",
+    "🗓️ Monthly Cohort Retention Heatmap",
+    "📋 RFM Segment Strategic Matrix"
+]
+
 def render_customers_view(customers_df: pd.DataFrame, orders_df: pd.DataFrame, items_df: pd.DataFrame):
     is_full_baseline = (len(orders_df) == 99441 and len(items_df) == 112650 and len(customers_df) == 99441)
     
@@ -85,11 +91,7 @@ def render_customers_view(customers_df: pd.DataFrame, orders_df: pd.DataFrame, i
     st.markdown("<br>", unsafe_allow_html=True)
     
     # 2. Section Selector (Selective execution)
-    active_sec = render_section_selector([
-        "👥 RFM Customer Segments & Frequency",
-        "🗓️ Monthly Cohort Retention Heatmap",
-        "📋 RFM Segment Strategic Matrix"
-    ], key="customers_sec")
+    active_sec = render_section_selector(CUSTOMERS_SECTIONS, key="customers_sec")
     
     segment_colors = {
         "Top Value": "#10B981",
@@ -199,21 +201,35 @@ def render_customers_view(customers_df: pd.DataFrame, orders_df: pd.DataFrame, i
     elif active_sec == "📋 RFM Segment Strategic Matrix":
         if not rfm_summary.empty:
             disp_rfm = rfm_summary.copy()
-            disp_rfm["customer_count"] = disp_rfm["customer_count"].apply(lambda x: f"{x:,}")
-            disp_rfm["customer_share_pct"] = disp_rfm["customer_share_pct"].apply(lambda x: f"{x:.2f}%")
-            disp_rfm["total_revenue_brl"] = disp_rfm["total_revenue_brl"].apply(lambda x: f"R$ {x:,.2f}")
-            disp_rfm["revenue_share_pct"] = disp_rfm["revenue_share_pct"].apply(lambda x: f"{x:.2f}%")
-            disp_rfm["avg_recency_days"] = disp_rfm["avg_recency_days"].apply(lambda x: f"{x:.1f} days")
-            disp_rfm["avg_monetary_brl"] = disp_rfm["avg_monetary_brl"].apply(lambda x: f"R$ {x:,.2f}")
+            if "customer_count" in disp_rfm.columns:
+                disp_rfm["customer_count"] = disp_rfm["customer_count"].apply(lambda x: f"{x:,}")
+            if "customer_pct" in disp_rfm.columns:
+                disp_rfm["customer_pct"] = disp_rfm["customer_pct"].apply(lambda x: f"{x:.2f}%")
+            if "repeat_customers" in disp_rfm.columns:
+                disp_rfm["repeat_customers"] = disp_rfm["repeat_customers"].apply(lambda x: f"{x:,}")
+            if "repeat_buyer_pct" in disp_rfm.columns:
+                disp_rfm["repeat_buyer_pct"] = disp_rfm["repeat_buyer_pct"].apply(lambda x: f"{x:.2f}%")
+            if "total_revenue_brl" in disp_rfm.columns:
+                disp_rfm["total_revenue_brl"] = disp_rfm["total_revenue_brl"].apply(lambda x: f"R$ {x:,.2f}")
+            if "revenue_pct" in disp_rfm.columns:
+                disp_rfm["revenue_pct"] = disp_rfm["revenue_pct"].apply(lambda x: f"{x:.2f}%")
+            if "avg_recency_days" in disp_rfm.columns:
+                disp_rfm["avg_recency_days"] = disp_rfm["avg_recency_days"].apply(lambda x: f"{x:.1f} days")
+            if "avg_frequency" in disp_rfm.columns:
+                disp_rfm["avg_frequency"] = disp_rfm["avg_frequency"].apply(lambda x: f"{x:.2f}")
+            if "avg_spend_brl" in disp_rfm.columns:
+                disp_rfm["avg_spend_brl"] = disp_rfm["avg_spend_brl"].apply(lambda x: f"R$ {x:,.2f}")
             disp_rfm.rename(columns={
                 "segment": "RFM Segment",
                 "customer_count": "Customers",
-                "customer_share_pct": "Customer Share",
+                "customer_pct": "Customer Share",
+                "repeat_customers": "Repeat Buyers",
+                "repeat_buyer_pct": "Repeat Share %",
                 "total_revenue_brl": "Total Revenue (R$)",
-                "revenue_share_pct": "Revenue Share",
+                "revenue_pct": "Revenue Share",
                 "avg_recency_days": "Avg Recency",
-                "avg_monetary_brl": "AOV / CLV",
-                "strategy": "Strategic Action"
+                "avg_frequency": "Avg Frequency",
+                "avg_spend_brl": "Avg Spend (R$)"
             }, inplace=True)
             st.dataframe(disp_rfm, use_container_width=True, hide_index=True)
-            render_download_button(rfm_summary, "rfm_segment_summary.csv", "📥 Export RFM Summary (CSV)", key="download_rfm_summary_csv")
+            render_download_button(rfm_summary, "rfm_segment_summary.csv", "📥 Export RFM Segment Summary (CSV)", key="download_rfm_csv")

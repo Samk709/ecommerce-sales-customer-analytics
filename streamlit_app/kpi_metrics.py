@@ -17,21 +17,80 @@ import numpy as np
 from typing import Dict, Any, Tuple, Optional, List
 import streamlit as st
 
-# Verified platform baseline constants for instant unfiltered access
-BASELINE_KPIS = {
-    "total_revenue_brl": 13221498.11,
-    "total_delivered_orders": 96478,
-    "repeat_customers_count": 2801,
-    "aov_brl": 137.04,
-    "total_freight_brl": 2198275.64,
-    "gmv_brl": 15419773.75,
-    "assumed_cogs_brl": 7832679.13,
-    "assumed_gross_profit_brl": 5388818.98,
-    "blended_gross_margin_pct": 40.76,
-    "total_unique_customers": 93358,
-    "repeat_customer_rate_pct": 3.0,
-    "total_items_sold": 110197
-}
+def compute_baseline_kpis_from_tables(
+    orders_df: pd.DataFrame,
+    items_df: pd.DataFrame,
+    customers_df: pd.DataFrame
+) -> Dict[str, Any]:
+    """
+    Computes platform baseline KPIs directly from data tables.
+    Used for live calculation and test verification against full tables.
+    """
+    deliv_orders = orders_df[orders_df["order_status"] == "delivered"]
+    deliv_order_ids = set(deliv_orders["order_id"])
+    deliv_items = items_df[items_df["order_id"].isin(deliv_order_ids)]
+
+    total_revenue_brl = round(float(deliv_items["price"].sum()), 2)
+    total_delivered_orders = int(deliv_orders["order_id"].nunique())
+    total_freight_brl = round(float(deliv_items["freight_value"].sum()), 2)
+    gmv_brl = round(total_revenue_brl + total_freight_brl, 2)
+    aov_brl = round(total_revenue_brl / total_delivered_orders, 2) if total_delivered_orders > 0 else 0.0
+
+    assumed_cogs_brl = round(float(deliv_items["assumed_cogs_brl"].sum()), 2)
+    assumed_gross_profit_brl = round(float(deliv_items["assumed_gross_profit_brl"].sum()), 2)
+    blended_margin_pct = round((assumed_gross_profit_brl / total_revenue_brl) * 100, 2) if total_revenue_brl > 0 else 0.0
+
+    deliv_customer_ids = set(deliv_orders["customer_id"])
+    deliv_customers = customers_df[customers_df["customer_id"].isin(deliv_customer_ids)]
+
+    total_unique_customers = int(deliv_customers["customer_unique_id"].nunique())
+    repeat_customers_count = int(deliv_customers[deliv_customers["is_repeat_customer"] == 1]["customer_unique_id"].nunique())
+    repeat_rate_pct = round((repeat_customers_count / total_unique_customers) * 100, 2) if total_unique_customers > 0 else 0.0
+
+    return {
+        "total_revenue_brl": total_revenue_brl,
+        "total_delivered_orders": total_delivered_orders,
+        "repeat_customers_count": repeat_customers_count,
+        "aov_brl": aov_brl,
+        "total_freight_brl": total_freight_brl,
+        "gmv_brl": gmv_brl,
+        "assumed_cogs_brl": assumed_cogs_brl,
+        "assumed_gross_profit_brl": assumed_gross_profit_brl,
+        "blended_gross_margin_pct": blended_margin_pct,
+        "total_unique_customers": total_unique_customers,
+        "repeat_customer_rate_pct": repeat_rate_pct,
+        "total_items_sold": len(deliv_items)
+    }
+
+def _load_baseline_kpis() -> Dict[str, Any]:
+    """Loads baseline KPIs computed from data (from pre-aggregated parquet or tables)."""
+    import os
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    pq_path = os.path.join(base_dir, "data", "exports", "baseline_kpis.parquet")
+    if os.path.exists(pq_path):
+        df = pd.read_parquet(pq_path)
+        if not df.empty:
+            res = df.iloc[0].to_dict()
+            return {
+                "total_revenue_brl": float(res["total_revenue_brl"]),
+                "total_delivered_orders": int(res["total_delivered_orders"]),
+                "repeat_customers_count": int(res["repeat_customers_count"]),
+                "aov_brl": float(res["aov_brl"]),
+                "total_freight_brl": float(res["total_freight_brl"]),
+                "gmv_brl": float(res["gmv_brl"]),
+                "assumed_cogs_brl": float(res["assumed_cogs_brl"]),
+                "assumed_gross_profit_brl": float(res["assumed_gross_profit_brl"]),
+                "blended_gross_margin_pct": float(res["blended_gross_margin_pct"]),
+                "total_unique_customers": int(res["total_unique_customers"]),
+                "repeat_customer_rate_pct": float(res["repeat_customer_rate_pct"]),
+                "total_items_sold": int(res["total_items_sold"])
+            }
+    from streamlit_app.data_loader import load_core_dimensions
+    orders_df, items_df, customers_df, _ = load_core_dimensions()
+    return compute_baseline_kpis_from_tables(orders_df, items_df, customers_df)
+
+# Dynamic baseline KPIs computed from data
+BASELINE_KPIS = _load_baseline_kpis()
 
 def compute_overview_kpis(
     orders_df: pd.DataFrame,

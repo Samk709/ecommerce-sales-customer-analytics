@@ -26,6 +26,12 @@ from streamlit_app.data_loader import (
     load_products_top20_summary
 )
 
+PRODUCTS_SECTIONS = [
+    "📊 Sector Profitability & Margins",
+    "⚖️ 80/20 Product Pareto Curve",
+    "🏆 Top 20 Best-Selling Products"
+]
+
 def render_products_view(orders_df: pd.DataFrame, items_df: pd.DataFrame, products_df: pd.DataFrame):
     st.markdown(
         '<div class="financial-notice"><b>Financial Notice</b>: Product cost and profitability figures are calculated using benchmark category margins '
@@ -102,11 +108,7 @@ def render_products_view(orders_df: pd.DataFrame, items_df: pd.DataFrame, produc
     st.markdown("<br>", unsafe_allow_html=True)
     
     # 3. Section Selector (Selective execution)
-    active_sec = render_section_selector([
-        "📊 Sector Profitability & Margins",
-        "⚖️ 80/20 Product Pareto Curve",
-        "🏆 Top 20 Best-Selling Products"
-    ], key="products_sec")
+    active_sec = render_section_selector(PRODUCTS_SECTIONS, key="products_sec")
     
     if active_sec == "📊 Sector Profitability & Margins":
         rev_col = "total_revenue_brl" if "total_revenue_brl" in cat_summary.columns else "Revenue"

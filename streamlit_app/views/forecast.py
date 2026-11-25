@@ -24,6 +24,11 @@ from streamlit_app.components import (
 )
 from streamlit_app.data_loader import load_sales_forecast
 
+FORECAST_SECTIONS = [
+    "📈 30-Day Forward Forecast & Holdout Projection",
+    "📋 Daily Forecast & Validation Data Table"
+]
+
 def render_forecast_view():
     st.markdown(
         '<div class="financial-notice"><b>Forecasting Methodology</b>: Baseline 30-day forward projection generated using an additive '
@@ -65,10 +70,7 @@ def render_forecast_view():
     st.markdown("<br>", unsafe_allow_html=True)
     
     # 2. Section Selector (Selective execution)
-    active_sec = render_section_selector([
-        "📈 30-Day Forward Forecast & Holdout Projection",
-        "📋 Daily Forecast & Validation Data Table"
-    ], key="forecast_sec")
+    active_sec = render_section_selector(FORECAST_SECTIONS, key="forecast_sec")
     
     if active_sec == "📈 30-Day Forward Forecast & Holdout Projection":
         if not fc_df.empty:

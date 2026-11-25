@@ -126,6 +126,42 @@ def generate_all():
     lt_binned.sort_values("lead_time_days", inplace=True)
     lt_binned.to_parquet(os.path.join(EXPORTS_DIR, "lead_time_distribution.parquet"), index=False)
 
+    # (g) Baseline headline KPIs (computed dynamically from data tables)
+    deliv_cust = deliv_orders.merge(customers[["customer_id", "customer_unique_id", "is_repeat_customer"]], on="customer_id")
+    tot_rev_val = round(float(deliv_items["price"].sum()), 2)
+    tot_deliv_ord = int(deliv_orders["order_id"].nunique())
+    tot_freight_val = round(float(deliv_items["freight_value"].sum()), 2)
+    tot_gmv_val = round(tot_rev_val + tot_freight_val, 2)
+    aov_val = round(tot_rev_val / tot_deliv_ord, 2)
+    tot_cogs_val = round(float(deliv_items["assumed_cogs_brl"].sum()), 2)
+    tot_gp_val = round(float(deliv_items["assumed_gross_profit_brl"].sum()), 2)
+    margin_val = round((tot_gp_val / tot_rev_val) * 100, 2)
+    uniq_cust_val = int(deliv_cust["customer_unique_id"].nunique())
+    repeat_cust_val = int(deliv_cust[deliv_cust["is_repeat_customer"] == 1]["customer_unique_id"].nunique())
+    repeat_rate_val = round((repeat_cust_val / uniq_cust_val) * 100, 2)
+    tot_items_val = int(len(deliv_items))
+
+    baseline_kpis = {
+        "total_revenue_brl": tot_rev_val,
+        "total_delivered_orders": tot_deliv_ord,
+        "repeat_customers_count": repeat_cust_val,
+        "aov_brl": aov_val,
+        "total_freight_brl": tot_freight_val,
+        "gmv_brl": tot_gmv_val,
+        "assumed_cogs_brl": tot_cogs_val,
+        "assumed_gross_profit_brl": tot_gp_val,
+        "blended_gross_margin_pct": margin_val,
+        "total_unique_customers": uniq_cust_val,
+        "repeat_customer_rate_pct": repeat_rate_val,
+        "total_items_sold": tot_items_val
+    }
+    pd.DataFrame([baseline_kpis]).to_parquet(os.path.join(EXPORTS_DIR, "baseline_kpis.parquet"), index=False)
+
+    # (h) RFM segment summary parquet
+    rfm_csv_path = os.path.join(EXPORTS_DIR, "rfm_segment_summary.csv")
+    if os.path.exists(rfm_csv_path):
+        pd.read_csv(rfm_csv_path).to_parquet(os.path.join(EXPORTS_DIR, "rfm_segment_summary.parquet"), index=False)
+
     print("All pre-aggregated Parquet files successfully generated!")
 
 if __name__ == "__main__":

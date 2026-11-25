@@ -29,6 +29,12 @@ from streamlit_app.data_loader import (
     load_order_reviews
 )
 
+DELIVERY_SECTIONS = [
+    "⭐ SLA Breach & CSAT Comparison",
+    "📉 Late Order Rating Decay (OLS Regression)",
+    "📋 Fulfillment Delay Tiers Data Table"
+]
+
 def render_delivery_view(orders_df: pd.DataFrame):
     st.markdown(
         '<div class="financial-notice"><b>Fulfillment Standard</b>: Delivery delay is evaluated on a strict calendar-day basis '
@@ -73,11 +79,7 @@ def render_delivery_view(orders_df: pd.DataFrame):
     st.markdown("<br>", unsafe_allow_html=True)
     
     # 2. Section Selector (Selective execution)
-    active_sec = render_section_selector([
-        "⭐ SLA Breach & CSAT Comparison",
-        "📉 Late Order Rating Decay (OLS Regression)",
-        "📋 Fulfillment Delay Tiers Data Table"
-    ], key="delivery_sec")
+    active_sec = render_section_selector(DELIVERY_SECTIONS, key="delivery_sec")
     
     csat_summary = load_delivery_csat_summary()
 

@@ -24,6 +24,12 @@ from streamlit_app.components import (
 from streamlit_app.kpi_metrics import compute_overview_kpis
 from streamlit_app.data_loader import load_overview_monthly_trend, load_overview_state_summary
 
+OVERVIEW_SECTIONS = [
+    "📈 Monthly Revenue & Growth Trend",
+    "🗺️ Top States Geographic Concentration",
+    "📋 Monthly Sales Summary Table"
+]
+
 def render_overview_view(orders_df: pd.DataFrame, items_df: pd.DataFrame, customers_df: pd.DataFrame, is_filtered: bool):
     # 1. Compute Headline KPIs
     kpis = compute_overview_kpis(orders_df, items_df, customers_df)
@@ -132,11 +138,7 @@ def render_overview_view(orders_df: pd.DataFrame, items_df: pd.DataFrame, custom
     st.markdown("<br>", unsafe_allow_html=True)
     
     # 3. Section Selector (Selective execution: only computes active tab)
-    active_sec = render_section_selector([
-        "📈 Monthly Revenue & Growth Trend",
-        "🗺️ Top States Geographic Concentration",
-        "📋 Monthly Sales Summary Table"
-    ], key="overview_sec")
+    active_sec = render_section_selector(OVERVIEW_SECTIONS, key="overview_sec")
     
     if active_sec == "📈 Monthly Revenue & Growth Trend":
         if not is_filtered:

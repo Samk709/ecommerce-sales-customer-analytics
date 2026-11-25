@@ -257,11 +257,27 @@ Demonstrates reactive dashboard recalculation when filtered by Customer State = 
    ```
 
 ### 8.4 Running Analytics & Exporting Star Schema
-Execute the statistical analytics engine to generate RFM segments, cohort retention matrices, forecast models, and Power BI Star Schema tables:
+Execute the statistical analytics engine to generate RFM segments, cohort retention matrices, forecast models, Power BI Star Schema tables, and optimized application Parquet files:
 ```powershell
+# 1. Run statistical exploratory data analysis (RFM, Cohorts, Pareto, Forecast, Delivery)
 python -m src.analysis.run_eda
+
+# 2. Export Star Schema dimension and fact CSVs for Power BI
 python -m src.analysis.export_powerbi_data
+
+# 3. Generate high-performance columnar Parquet files and pre-aggregated summaries for Streamlit
+python -m src.analysis.generate_app_data
 ```
+
+> **Data Pipeline Execution Order Summary**:
+> 1. `python -m src.preprocessing.audit` (Raw data hygiene and structural validation)
+> 2. `python -m src.preprocessing.clean_data` (Data cleaning and enrichment)
+> 3. `python -m src.database.load_data` (Relational schema creation and MySQL population)
+> 4. `python -m src.database.verify_db` (Database row count verification)
+> 5. `python -m src.analysis.run_eda` (Statistical EDA, RFM, cohorts, Holt-Winters forecasting)
+> 6. `python -m src.analysis.export_powerbi_data` (Production Star Schema CSV exports for Power BI)
+> 7. `python -m src.analysis.generate_app_data` (Columnar Parquet conversion & pre-aggregated app cache)
+> 8. `streamlit run streamlit_app/app.py` (Interactive analytics web application)
 
 ### 8.5 Launching the Streamlit Web Application
 Run the interactive Streamlit dashboard locally:
@@ -274,7 +290,7 @@ Open your browser to `http://localhost:8501`.
 
 ## 9. Free Cloud Deployment (Streamlit Community Cloud)
 
-The Streamlit web application is engineered for zero-database deployment. All data access in `streamlit_app/data_loader.py` resolves relative to `__file__`, and all dependencies are pinned in root `requirements.txt`.
+The Streamlit web application is engineered for zero-database deployment. All data access in `streamlit_app/data_loader.py` resolves relative to `__file__`, reading directly from optimized Apache Parquet tables and pre-aggregated summaries in `data/exports/` with columnar loading (`usecols`), compact dtypes, and `@st.cache_data`. All dependencies are pinned in root `requirements.txt`.
 
 ### Step-by-Step Deployment Instructions:
 1. Ensure your latest changes are pushed to your public GitHub repository (`main` branch).
@@ -294,7 +310,7 @@ The Streamlit web application is engineered for zero-database deployment. All da
 
 ## 10. Automated Testing & Quality Assurance
 
-A comprehensive test suite containing **47 automated unit tests** validates end-to-end data quality, database constraints, business queries, financial balances, and UI rendering:
+A comprehensive test suite containing **49 automated unit tests** validates end-to-end data quality, database constraints, business queries, financial balances, and UI rendering:
 
 ```powershell
 pytest -v tests
@@ -306,9 +322,9 @@ pytest -v tests
 - `tests/test_sql_queries.py`: Financial reconciliations, status totals, SLA tier reconciliations, and review score sums (11 tests).
 - `tests/test_eda.py`: RFM customer and revenue balances, cohort bounds, Pareto distributions, and holdout WAPE validation (7 tests).
 - `tests/test_powerbi_exports.py`: Star Schema row counts, referential integrity, and financial totals (5 tests).
-- `tests/test_streamlit_kpis.py`: Standalone verification that unfiltered baseline KPIs match exact platform numbers (3 tests).
+- `tests/test_streamlit_kpis.py`: Standalone verification that unfiltered baseline KPIs match exact platform numbers, plus live calculation test recomputing baseline KPIs from raw full tables (5 tests).
 - `tests/test_readme_reconciliation.py`: End-to-end validation of all published headline numbers and claims against exported data (7 tests).
-- `tests/test_app_pages.py`: Streamlit AppTest smoke tests verifying all 5 dashboard views and filtering render without exceptions (6 tests).
+- `tests/test_app_pages.py`: Streamlit AppTest smoke tests verifying all 5 dashboard views, all 14 individual tab sections, and reactive State = SP filtering render with zero exceptions (7 tests).
 
 ---
 
