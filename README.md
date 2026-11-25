@@ -42,7 +42,7 @@ flowchart TD
     end
 
     subgraph Quality["5. Automated Pytest Validation"]
-        Q["Pytest Test Suite (40 Tests)\n(Referential, Financial, Logic Validation)"] -.-> D
+        Q["Pytest Test Suite (46 Tests)\n(Referential, Financial, Logic Validation)"] -.-> D
         Q -.-> N
         Q -.-> O
     end
@@ -91,7 +91,7 @@ flowchart TD
 │   ├── data_loader.py                 # Relative path cached CSV loader (@st.cache_data)
 │   ├── components.py                  # Custom CSS styling and HTML KPI cards
 │   └── views/                         # 5 report view modules (Overview, Products, Customers, Delivery, Forecast)
-├── tests/                             # Pytest automated test suite (40 passing tests)
+├── tests/                             # Pytest automated test suite (46 passing tests)
 ├── requirements.txt                   # Production pinned dependencies
 ├── .env.example                       # Secure environment configuration template
 └── README.md                          # Platform master documentation
@@ -110,7 +110,7 @@ flowchart TD
 | **Data Visualization** | **Plotly, Matplotlib, Seaborn** | Interactive UI charts, publication-ready statistical plots |
 | **Web Application** | **Streamlit** (v1.65.0) | Multi-page executive dashboard with zero-database cloud architecture |
 | **Business Intelligence** | **Power BI Desktop** (Specification) | Star Schema data model, 34 DAX measures, executive layout specs |
-| **Quality Assurance** | **Pytest** | 40 automated tests validating referential integrity and financial balance |
+| **Quality Assurance** | **Pytest** | 46 automated tests validating referential integrity, financial balance, and page rendering |
 | **Version Control** | **Git, GitHub** | Source tracking, semantic commits, cloud deployment trigger |
 
 ---
@@ -294,7 +294,7 @@ The Streamlit web application is engineered for zero-database deployment. All da
 
 ## 10. Automated Testing & Quality Assurance
 
-A comprehensive test suite containing **40 automated unit tests** validates end-to-end data quality, database constraints, business queries, and financial balances:
+A comprehensive test suite containing **46 automated unit tests** validates end-to-end data quality, database constraints, business queries, financial balances, and UI rendering:
 
 ```powershell
 pytest -v tests
@@ -308,6 +308,7 @@ pytest -v tests
 - `tests/test_powerbi_exports.py`: Star Schema row counts, referential integrity, and financial totals (5 tests).
 - `tests/test_streamlit_kpis.py`: Standalone verification that unfiltered baseline KPIs match exact platform numbers (3 tests).
 - `tests/test_readme_reconciliation.py`: End-to-end validation of all published headline numbers and claims against exported data (7 tests).
+- `tests/test_app_pages.py`: Streamlit AppTest smoke tests verifying all 5 dashboard views and filtering render without exceptions (6 tests).
 
 ---
 

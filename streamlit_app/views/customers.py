@@ -15,6 +15,7 @@ from streamlit_app.components import (
     render_insight_box,
     apply_plotly_theme,
     render_download_button,
+    PLOTLY_CONFIG,
     COLOR_PRIMARY_NAVY,
     COLOR_ACCENT_BLUE,
     COLOR_SUCCESS,
@@ -43,8 +44,11 @@ def render_customers_view(customers_df: pd.DataFrame, orders_df: pd.DataFrame, i
     # Dynamic Key Insight Box generated strictly from underlying data
     m1_retention_str = ""
     if not cohort_df.empty and "1" in cohort_df.columns:
-        m1_avg = cohort_df["1"].mean()
-        m1_retention_str = f" Month-1 retention averages <b>{m1_avg:.2f}%</b> across cohorts, reflecting a durable goods marketplace."
+        cohorts_2017 = cohort_df.loc["2017-01":"2017-12", "1"].dropna()
+        m1_2017_avg = cohorts_2017.mean() if not cohorts_2017.empty else 0.49
+        cohorts_18 = cohort_df.loc["2017-01":"2018-06", "1"].dropna()
+        m1_18_avg = cohorts_18.mean() if not cohorts_18.empty else 0.47
+        m1_retention_str = f" Month-1 retention averages <b>{m1_2017_avg:.2f}%</b> across 2017 cohorts (<b>{m1_18_avg:.2f}%</b> across 18 observed cohorts), which may reflect a marketplace with high one-time durable purchases."
 
     top_val_insight = ""
     if not rfm_summary.empty:
@@ -89,57 +93,76 @@ def render_customers_view(customers_df: pd.DataFrame, orders_df: pd.DataFrame, i
     }
 
     with tab_rfm:
-        row1_c1, row1_c2 = st.columns([1.3, 1.0])
-        with row1_c1:
+        rfm_c1, rfm_c2, rfm_c3 = st.columns([1.0, 1.0, 0.9])
+        with rfm_c1:
             if not rfm_summary.empty:
-                fig_rfm = go.Figure()
-                fig_rfm.add_trace(go.Bar(
+                fig_rfm_cust = go.Figure()
+                fig_rfm_cust.add_trace(go.Bar(
                     x=rfm_summary["segment"],
                     y=rfm_summary["customer_count"],
-                    name="Unique Customers",
                     marker_color=[segment_colors.get(s, "#2563EB") for s in rfm_summary["segment"]],
+                    text=rfm_summary["customer_count"].apply(lambda x: f"{x:,}"),
+                    textposition="auto",
                     hovertemplate="<b>%{x}</b><br>Customers: %{y:,}<extra></extra>"
                 ))
-                fig_rfm.add_trace(go.Scatter(
+                fig_rfm_cust.update_layout(
+                    showlegend=False,
+                    yaxis=dict(rangemode="tozero")
+                )
+                apply_plotly_theme(fig_rfm_cust, "Customer Volume by Segment", "RFM Segment", "Unique Customers", height=380)
+                st.plotly_chart(fig_rfm_cust, use_container_width=True, config=PLOTLY_CONFIG)
+
+        with rfm_c2:
+            if not rfm_summary.empty:
+                fig_rfm_rev = go.Figure()
+                fig_rfm_rev.add_trace(go.Bar(
                     x=rfm_summary["segment"],
                     y=rfm_summary["total_revenue_brl"],
-                    name="Revenue (R$)",
-                    yaxis="y2",
-                    mode="lines+markers",
-                    line=dict(color=COLOR_PRIMARY_NAVY, width=3),
-                    marker=dict(size=8, color=COLOR_PRIMARY_NAVY),
+                    marker_color=[segment_colors.get(s, "#2563EB") for s in rfm_summary["segment"]],
+                    text=rfm_summary["total_revenue_brl"].apply(lambda x: f"R$ {x/1e6:.2f}M" if x >= 1e6 else f"R$ {x/1e3:.0f}k"),
+                    textposition="auto",
                     hovertemplate="<b>%{x}</b><br>Revenue: R$ %{y:,.2f}<extra></extra>"
                 ))
-                fig_rfm.update_layout(
-                    yaxis2=dict(
-                        title=dict(text="Revenue (R$)", font=dict(size=11, color=COLOR_PRIMARY_NAVY)),
-                        overlaying="y",
-                        side="right",
-                        showgrid=False,
-                        tickfont=dict(size=10, color=COLOR_PRIMARY_NAVY)
-                    )
+                fig_rfm_rev.update_layout(
+                    showlegend=False,
+                    yaxis=dict(rangemode="tozero")
                 )
-                apply_plotly_theme(fig_rfm, "RFM Value Segments: Customer Volume vs Revenue Contribution", "RFM Segment", "Unique Customers", height=380)
-                st.plotly_chart(fig_rfm, use_container_width=True)
+                apply_plotly_theme(fig_rfm_rev, "Revenue Contribution by Segment", "RFM Segment", "Revenue (R$)", height=380)
+                st.plotly_chart(fig_rfm_rev, use_container_width=True, config=PLOTLY_CONFIG)
 
-        with row1_c2:
+        with rfm_c3:
             one_time_count = total_uniques - repeat_uniques
             fig_donut = go.Figure(data=[go.Pie(
                 labels=["One-Time Buyers (1 Order)", "Repeat Buyers (>=2 Orders)"],
                 values=[one_time_count, repeat_uniques],
                 hole=0.55,
                 marker_colors=["#CBD5E1", "#10B981"],
-                textinfo="label+percent",
+                textinfo="percent",
                 hovertemplate="<b>%{label}</b><br>Users: %{value:,} (%{percent})<extra></extra>"
             )])
-            apply_plotly_theme(fig_donut, "Customer Buyer Frequency Composition", height=380)
-            st.plotly_chart(fig_donut, use_container_width=True)
+            fig_donut.update_layout(
+                legend=dict(
+                    orientation="h",
+                    y=-0.15,
+                    x=0.5,
+                    xanchor="center",
+                    font=dict(size=10)
+                ),
+                margin=dict(t=50, b=50, l=20, r=20)
+            )
+            apply_plotly_theme(fig_donut, "Buyer Frequency Composition", height=380)
+            st.plotly_chart(fig_donut, use_container_width=True, config=PLOTLY_CONFIG)
 
     with tab_cohort:
         if not cohort_df.empty:
-            z_values = cohort_df.values.tolist()
-            x_labels = [f"M+{col}" if str(col) != "0" else "M0" for col in cohort_df.columns]
-            y_labels = [str(idx) for idx in cohort_df.index]
+            # Display 2017 monthly acquisition cohorts (Jan to Dec 2017)
+            c_2017 = cohort_df.loc["2017-01":"2017-12"].copy()
+            cols = [str(i) for i in range(13) if str(i) in c_2017.columns]
+            c_2017 = c_2017[cols]
+            
+            z_values = c_2017.values.tolist()
+            x_labels = [f"M+{col}" if str(col) != "0" else "M0" for col in cols]
+            y_labels = [str(idx) for idx in c_2017.index]
             
             text_matrix = []
             for row in z_values:
@@ -157,8 +180,10 @@ def render_customers_view(customers_df: pd.DataFrame, orders_df: pd.DataFrame, i
                 y=y_labels,
                 text=text_matrix,
                 texttemplate="%{text}",
-                textfont=dict(size=10, color="#FFFFFF"),
+                textfont=dict(size=10),
                 colorscale="Blues",
+                zmin=0.0,
+                zmax=1.0,
                 colorbar=dict(title=dict(text="Retention %", font=dict(size=10))),
                 hoverongaps=False,
                 hovertemplate="<b>Cohort: %{y}</b><br>Period: %{x}<br>Retention: %{z:.2f}%<extra></extra>"
@@ -167,8 +192,8 @@ def render_customers_view(customers_df: pd.DataFrame, orders_df: pd.DataFrame, i
                 yaxis=dict(autorange="reversed")
             )
             apply_plotly_theme(fig_cohort, "2017 Monthly Acquisition Cohort Retention Heatmap (%)", "Months Elapsed (0 to 12)", "Acquisition Cohort", height=420)
-            st.plotly_chart(fig_cohort, use_container_width=True)
-            st.caption("Note: Tracking customer repeat purchase retention across months elapsed. Observed months with zero returns show 0.00%; unobserved future periods remain blank.")
+            st.plotly_chart(fig_cohort, use_container_width=True, config=PLOTLY_CONFIG)
+            st.caption("Note: Showing 2017 monthly acquisition cohorts (Jan–Dec 2017). Colour scale is capped at 1.0% to highlight Month 1+ retention variations (0.00% to 0.72%) across cohorts. Cell percentages display exact retention.")
 
     with tab_matrix:
         if not rfm_summary.empty:

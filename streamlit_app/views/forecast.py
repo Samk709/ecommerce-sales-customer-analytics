@@ -15,6 +15,7 @@ from streamlit_app.components import (
     render_insight_box,
     apply_plotly_theme,
     render_download_button,
+    PLOTLY_CONFIG,
     COLOR_PRIMARY_NAVY,
     COLOR_ACCENT_BLUE,
     COLOR_SUCCESS,
@@ -26,7 +27,7 @@ def render_forecast_view():
     st.markdown(
         '<div class="financial-notice"><b>Forecasting Methodology</b>: Baseline 30-day forward projection generated using an additive '
         '<b>Holt-Winters Exponential Smoothing</b> model capturing daily baseline trend and 7-day weekly cyclicality. '
-        'Model accuracy is validated against an operational 30-day holdout test window. Currency: Brazilian Reais (R$).</div>',
+        'Model accuracy is validated against an operational 30-day holdout test window; the forward horizon serves as an illustrative baseline. Currency: Brazilian Reais (R$).</div>',
         unsafe_allow_html=True
     )
     
@@ -38,13 +39,13 @@ def render_forecast_view():
         total_30d_proj = future_30d.sum()
         avg_30d_proj = future_30d.mean()
         insight_text = (
-            f"💡 <b>Key Insight</b>: The additive Holt-Winters forecast models 7-day weekly cyclicality, "
-            f"achieving a strong holdout <b>WAPE of 12.90%</b> (MAE: <b>R$ 4,647.90</b> vs holdout mean R$ 36,038.69). "
-            f"Over the next 30-day forward horizon, delivered merchandise revenue is projected at "
-            f"<b>R$ {total_30d_proj:,.2f}</b> (averaging <b>R$ {avg_30d_proj:,.2f}/day</b>)."
+            f"💡 <b>Key Insight</b>: The additive Holt-Winters model captures 7-day weekly cyclicality with a "
+            f"<b>holdout WAPE of 12.90%</b> (MAE: <b>R$ 4,647.90</b> vs holdout mean R$ 36,038.69). "
+            f"Over the 30-day forward horizon after dataset end, delivered merchandise revenue is projected at "
+            f"<b>R$ {total_30d_proj:,.2f}</b> (averaging <b>R$ {avg_30d_proj:,.2f}/day</b>) as an illustrative baseline."
         )
     else:
-        insight_text = "💡 <b>Key Insight</b>: 30-day baseline sales forecast captures 7-day weekly cyclicality with 12.90% holdout WAPE."
+        insight_text = "💡 <b>Key Insight</b>: 30-day baseline sales forecast captures 7-day weekly cyclicality with holdout WAPE 12.90%."
     render_insight_box(insight_text)
 
     # 1. Validation Performance Metrics Cards
@@ -108,7 +109,7 @@ def render_forecast_view():
                 ))
                 
             apply_plotly_theme(fig_fc, "Daily Delivered Revenue with 30-Day Holt-Winters Projection (R$)", "Order Date", "Daily Revenue (R$)", height=440)
-            st.plotly_chart(fig_fc, use_container_width=True)
+            st.plotly_chart(fig_fc, use_container_width=True, config=PLOTLY_CONFIG)
 
     with tab_table:
         if not fc_df.empty:

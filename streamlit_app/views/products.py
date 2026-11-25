@@ -14,6 +14,7 @@ from streamlit_app.components import (
     render_insight_box,
     apply_plotly_theme,
     render_download_button,
+    PLOTLY_CONFIG,
     COLOR_PRIMARY_NAVY,
     COLOR_ACCENT_BLUE,
     COLOR_SUCCESS
@@ -118,10 +119,13 @@ def render_products_view(orders_df: pd.DataFrame, items_df: pd.DataFrame, produc
             yaxis=dict(autorange="reversed")
         )
         apply_plotly_theme(fig_cat, "Delivered Revenue vs Assumed Gross Profit by Macro Category", "Amount (R$)", "Category Group", height=420)
-        st.plotly_chart(fig_cat, use_container_width=True)
+        st.plotly_chart(fig_cat, use_container_width=True, config=PLOTLY_CONFIG)
 
     with tab_pareto:
         if not pareto_df.empty:
+            if "cum_product_pct" not in pareto_df.columns:
+                pareto_df["cum_product_pct"] = (pd.Series(range(1, len(pareto_df) + 1), index=pareto_df.index) / len(pareto_df)) * 100
+            
             total_skus = len(pareto_df)
             top_80_skus = len(pareto_df[pareto_df["cum_revenue_pct"] <= 80.0]) + 1
             top_80_pct = (top_80_skus / total_skus) * 100
@@ -141,7 +145,7 @@ def render_products_view(orders_df: pd.DataFrame, items_df: pd.DataFrame, produc
             fig_pareto.add_vline(x=top_80_pct, line_dash="dash", line_color="#10B981", annotation_text=f"Top {top_80_pct:.1f}% SKUs ({top_80_skus:,})", annotation_position="top left")
             
             apply_plotly_theme(fig_pareto, "Product Pareto Curve (80/20 Distribution)", "Cumulative % of Unique Products", "Cumulative % of Revenue", height=420)
-            st.plotly_chart(fig_pareto, use_container_width=True)
+            st.plotly_chart(fig_pareto, use_container_width=True, config=PLOTLY_CONFIG)
 
     with tab_skus:
         sku_summary = merged_prod.groupby(["product_id", "product_category_name_english", "category_group"]).agg(

@@ -126,7 +126,7 @@ def inject_custom_css():
             align-items: center;
         }
         .kpi-value {
-            font-size: 1.28rem;
+            font-size: 1.15rem;
             font-weight: 800;
             color: #1B2A4A;
             line-height: 1.15;
@@ -242,23 +242,31 @@ def render_insight_box(insight_text: str):
         unsafe_allow_html=True
     )
 
+# Global Plotly Chart Configuration (Hides modebar / hover controls)
+PLOTLY_CONFIG = {
+    "displayModeBar": False,
+    "responsive": True
+}
+
 def render_kpi_card(
     label: str,
     value: str,
     subtext: str = "",
     badge_text: str = "",
-    badge_type: str = "green"
+    badge_type: str = "green",
+    tooltip: str = ""
 ):
     """Renders a styled corporate KPI card with consistent size and readable typography."""
     badge_html = f'<span class="kpi-badge badge-{badge_type}">{badge_text}</span>' if badge_text else ''
+    title_attr = f' title="{tooltip}"' if tooltip else f' title="{value}"'
     st.markdown(
         f"""
-        <div class="kpi-card">
+        <div class="kpi-card"{title_attr}>
             <div class="kpi-label">
                 <span>{label}</span>
                 {badge_html}
             </div>
-            <div class="kpi-value">{value}</div>
+            <div class="kpi-value"{title_attr}>{value}</div>
             <div class="kpi-subtext">{subtext}</div>
         </div>
         """,
@@ -301,7 +309,7 @@ def apply_plotly_theme(
         template="plotly_white",
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=45, r=20, t=45 if title else 20, b=40),
+        margin=dict(l=45, r=20, t=55 if title else 20, b=40),
         height=height,
         font=dict(family="Segoe UI, sans-serif", size=11, color=COLOR_SLATE_DARK),
         xaxis=dict(

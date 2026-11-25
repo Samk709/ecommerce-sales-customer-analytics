@@ -8,6 +8,7 @@ Environment: Python 3.10 / 3.11, Streamlit, Plotly
 
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from streamlit_app.components import (
@@ -15,6 +16,7 @@ from streamlit_app.components import (
     render_insight_box,
     apply_plotly_theme,
     render_download_button,
+    PLOTLY_CONFIG,
     COLOR_PRIMARY_NAVY,
     COLOR_ACCENT_BLUE
 )
@@ -57,20 +59,71 @@ def render_overview_view(orders_df: pd.DataFrame, items_df: pd.DataFrame, custom
     )
     render_insight_box(insight_text)
     
+    # Helper for responsive executive card formatting
+    def format_compact_brl(val: float) -> str:
+        if abs(val) >= 1_000_000:
+            return f"R$ {val / 1_000_000:.2f}M"
+        elif abs(val) >= 10_000:
+            return f"R$ {val / 1_000:.1f}k"
+        else:
+            return f"R$ {val:,.2f}"
+
     # 2. Headline KPI Cards Row (Equal sizing and responsive spacing)
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     with c1:
-        render_kpi_card("Merchandise Revenue", f"R$ {kpis['total_revenue_brl']:,.2f}", "delivered orders only, excludes freight", "Delivered", "blue")
+        render_kpi_card(
+            "Merchandise Revenue",
+            format_compact_brl(kpis["total_revenue_brl"]),
+            f"R$ {kpis['total_revenue_brl']:,.2f} net",
+            "Delivered",
+            "blue",
+            tooltip=f"Exact Delivered Revenue: R$ {kpis['total_revenue_brl']:,.2f} (excludes freight)"
+        )
     with c2:
-        render_kpi_card("Gross Merchandise (GMV)", f"R$ {kpis['gmv_brl']:,.2f}", f"Freight: R$ {kpis['total_freight_brl']:,.0f}", "Total Checkout", "blue")
+        render_kpi_card(
+            "Gross Merchandise (GMV)",
+            format_compact_brl(kpis["gmv_brl"]),
+            f"Freight: R$ {kpis['total_freight_brl']:,.0f}",
+            "Checkout",
+            "blue",
+            tooltip=f"Total Checkout GMV: R$ {kpis['gmv_brl']:,.2f}"
+        )
     with c3:
-        render_kpi_card("Delivered Orders", f"{kpis['total_delivered_orders']:,}", f"{kpis['total_items_sold']:,} items sold", "Completed", "green")
+        render_kpi_card(
+            "Delivered Orders",
+            f"{kpis['total_delivered_orders']:,}",
+            f"{kpis['total_items_sold']:,} items sold",
+            "Completed",
+            "green",
+            tooltip=f"Total Delivered Orders: {kpis['total_delivered_orders']:,}"
+        )
     with c4:
-        render_kpi_card("Average Order Value", f"R$ {kpis['aov_brl']:,.2f}", "net spend per delivered order", "AOV", "blue")
+        render_kpi_card(
+            "Average Order Value",
+            f"R$ {kpis['aov_brl']:,.2f}",
+            "net spend per order",
+            "AOV",
+            "blue",
+            tooltip=f"Average Order Value: R$ {kpis['aov_brl']:,.2f}"
+        )
     with c5:
-        render_kpi_card("Assumed Gross Profit", f"R$ {kpis['assumed_gross_profit_brl']:,.2f}", f"{kpis['blended_gross_margin_pct']:.1f}% assumed margin", "Assumed", "amber")
+        render_kpi_card(
+            "Assumed Gross Profit",
+            format_compact_brl(kpis["assumed_gross_profit_brl"]),
+            f"{kpis['blended_gross_margin_pct']:.1f}% assumed margin",
+            "Assumed",
+            "amber",
+            tooltip=f"Assumed Gross Profit: R$ {kpis['assumed_gross_profit_brl']:,.2f} (assumed margin, not real data)"
+        )
     with c6:
-        render_kpi_card("Repeat Customers", f"{kpis['repeat_customers_count']:,}", f"{kpis['repeat_customer_rate_pct']:.2f}% repeat buyer rate", f"{kpis['total_unique_customers']:,} total", "green")
+        render_kpi_card(
+            "Repeat Customers",
+            f"{kpis['repeat_customers_count']:,}",
+            f"{kpis['repeat_customer_rate_pct']:.2f}% repeat rate",
+            "Repeat",
+            "green",
+            tooltip=f"Repeat Customers: {kpis['repeat_customers_count']:,} of {kpis['total_unique_customers']:,} unique buyers"
+        )
 
     st.markdown("<br>", unsafe_allow_html=True)
     
@@ -85,7 +138,14 @@ def render_overview_view(orders_df: pd.DataFrame, items_df: pd.DataFrame, custom
         merged_items = deliv_items.merge(orders_df[["order_id", "purchase_year_month"]], on="order_id")
         monthly_rev = merged_items.groupby("purchase_year_month")["price"].sum().reset_index()
         monthly_rev.rename(columns={"purchase_year_month": "Month", "price": "Revenue"}, inplace=True)
-        monthly_rev["MoM_Growth_Pct"] = monthly_rev["Revenue"].pct_change() * 100
+        
+        # Suppress MoM baseline distortions when prior month volume was under R$ 10,000
+        monthly_rev["prev_revenue"] = monthly_rev["Revenue"].shift(1)
+        monthly_rev["MoM_Growth_Pct"] = np.where(
+            (monthly_rev["prev_revenue"] >= 10000) & (monthly_rev["Revenue"] >= 10000),
+            ((monthly_rev["Revenue"] - monthly_rev["prev_revenue"]) / monthly_rev["prev_revenue"]) * 100,
+            np.nan
+        )
         
         fig_trend = go.Figure()
         fig_trend.add_trace(go.Bar(
@@ -115,7 +175,8 @@ def render_overview_view(orders_df: pd.DataFrame, items_df: pd.DataFrame, custom
             )
         )
         apply_plotly_theme(fig_trend, "Monthly Delivered Revenue (R$) & Month-over-Month Growth Rate", "Purchase Year-Month", "Revenue (R$)", height=400)
-        st.plotly_chart(fig_trend, use_container_width=True)
+        st.plotly_chart(fig_trend, use_container_width=True, config=PLOTLY_CONFIG)
+        st.caption("Note: Month-over-Month (MoM) growth is suppressed (—) for initial 2016 pilot months with monthly revenue under R$ 10,000 to prevent baseline percentage distortions.")
 
     with tab_geo:
         merged_cust = deliv_items.merge(orders_df[["order_id", "customer_id"]], on="order_id").merge(
@@ -137,7 +198,7 @@ def render_overview_view(orders_df: pd.DataFrame, items_df: pd.DataFrame, custom
             hovertemplate="<b>State: %{y}</b><br>Delivered Revenue: R$ %{x:,.2f}<extra></extra>"
         )
         apply_plotly_theme(fig_state, "Top 10 States by Delivered Revenue (R$)", "Revenue (R$)", "State", height=400)
-        st.plotly_chart(fig_state, use_container_width=True)
+        st.plotly_chart(fig_state, use_container_width=True, config=PLOTLY_CONFIG)
 
     with tab_table:
         disp_monthly = monthly_rev.copy()
