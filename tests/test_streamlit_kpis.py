@@ -45,7 +45,26 @@ def test_unfiltered_baseline_kpis(dataset):
     assert kpis["aov_brl"] == 137.04
     assert kpis["total_freight_brl"] == 2198275.64
     assert kpis["gmv_brl"] == 15419773.75
+    assert kpis["assumed_gross_profit_brl"] == 5388818.98
     assert kpis["total_unique_customers"] == 93358
+    assert kpis["blended_gross_margin_pct"] == 40.76
+
+def test_financial_kpis_and_margins(dataset):
+    """
+    Test that the KPI engine exactly reproduces verified financial totals:
+    - GMV = R$ 15,419,773.75 (= R$ 13,221,498.11 revenue + R$ 2,198,275.64 freight)
+    - Total Freight = R$ 2,198,275.64
+    - Assumed Gross Profit = R$ 5,388,818.98
+    - Blended Gross Margin = 40.76%
+    """
+    orders_df, items_df, customers_df, _ = dataset
+    kpis = compute_overview_kpis(orders_df, items_df, customers_df)
+    
+    assert kpis["total_revenue_brl"] == 13221498.11
+    assert kpis["total_freight_brl"] == 2198275.64
+    assert kpis["gmv_brl"] == 15419773.75
+    assert kpis["gmv_brl"] == round(kpis["total_revenue_brl"] + kpis["total_freight_brl"], 2)
+    assert kpis["assumed_gross_profit_brl"] == 5388818.98
     assert kpis["blended_gross_margin_pct"] == 40.76
 
 def test_filtered_kpis_subset_logic(dataset):

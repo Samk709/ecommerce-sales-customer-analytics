@@ -20,9 +20,17 @@ PAGE_MAPPING = {
 }
 
 def test_page_overview_renders():
-    """Verify Executive Overview page loads and runs without exception."""
+    """Verify Executive Overview page loads, runs without exception, and displays verified financial KPIs."""
     at = AppTest.from_file(APP_PATH, default_timeout=30).run()
     assert len(at.exception) == 0, f"Overview encountered exceptions: {at.exception}"
+    
+    # Verify rendered card values and tooltips
+    rendered_text = " ".join([m.value for m in at.markdown])
+    assert "Total Checkout GMV: R$ 15,419,773.75" in rendered_text
+    assert "Assumed Gross Profit: R$ 5,388,818.98" in rendered_text
+    assert "Freight: R$ 2,198,276" in rendered_text
+    assert "40.8% assumed margin" in rendered_text
+    assert "R$ 13,221,498.11 net" in rendered_text
 
 def test_page_products_renders():
     """Verify Products & Categories page loads without KeyError or exceptions."""

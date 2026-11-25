@@ -20,7 +20,7 @@ Each bullet incorporates the **Action-Context-Result** framework with exact, ver
 - **Analyzed Logistics SLA Impact on CSAT**: Evaluated **96,353 customer review ratings** with verified delivery dates against calendar delivery deadlines (Query 8; out of **96,361 total reviews** on delivered orders in Query 5, excluding 8 orders lacking delivery dates), identifying an immediate **2.02-star customer satisfaction cliff** upon delivery SLA breach (**4.29 on-time vs 2.27 late stars**) and modeling ongoing delay penalty at **-0.0160 stars/day late** ($p = 3.48 \times 10^{-32}$) via OLS regression.  
   *(Source: `docs/sql_results.md` Query 5 & Query 8; `docs/eda_findings.md` Section 5)*
 
-- **Developed Zero-Database Web App & Production Tests**: Deployed a zero-database interactive Streamlit analytics application with reactive multi-dimensional filtering, 30-day Holt-Winters revenue forecasting (**12.90% holdout WAPE**, **R$ 4,647.90 MAE**), and built an automated **46-test pytest suite** ensuring 100% financial reconciliation and exception-free page rendering across SQL, Python, and UI layers.  
+- **Developed Zero-Database Web App & Production Tests**: Deployed a zero-database interactive Streamlit analytics application with reactive multi-dimensional filtering, 30-day Holt-Winters revenue forecasting (**12.90% holdout WAPE**, **R$ 4,647.90 MAE**), and built an automated **47-test pytest suite** ensuring 100% financial reconciliation and exception-free page rendering across SQL, Python, and UI layers.  
   *(Source: `docs/eda_findings.md` Section 7; `tests/test_streamlit_kpis.py`)*
 
 ---
@@ -50,7 +50,7 @@ Built a 30-day additive Holt-Winters forecast capturing weekly seasonality, vali
 • SQL (MySQL 8.0): Normalized relational schema, CTEs, Window Functions, Query Optimization
 • Python (Pandas, Plotly, Statsmodels, SciPy): ETL, Cohort Retention, OLS Regression, Time-Series
 • Streamlit: Multi-page interactive executive web dashboard with zero-database cloud architecture
-• QA: 46 automated tests validating referential integrity, financial balance, and UI page rendering
+• QA: 47 automated tests validating referential integrity, financial balance, and UI page rendering
 
 🔗 Check out the full GitHub repository, SQL queries, and interactive dashboard code:
 https://github.com/Samk709/ecommerce-sales-customer-analytics
@@ -181,7 +181,7 @@ Instead, I decoupled analytics delivery from the database:
 
 #### Q15: How did you ensure data quality and financial reconciliation across your pipeline?
 **Answer:**  
-"I developed an automated 46-test suite in `pytest` organized into 8 test modules:
+"I developed an automated 47-test suite in `pytest` organized into 8 test modules:
 1. `test_data_quality.py`: Verifies primary key uniqueness, non-null constraints, price/freight non-negativity, and coordinate bounds.
 2. `test_db_connection.py`: Validates MySQL 8.0 connectivity and verifies schema table creation.
 3. `test_sql_queries.py`: Reconciles business queries against mathematical balances (e.g., running cumulative sales equal grand total; Q14 COGS + Gross Profit equal Merchandise Revenue R$ 13,221,498.11; Q5 reviews sum to 96,361 on delivered orders; Q8 reviews with verified delivery dates sum to 96,353 across 89,944 on-time and 6,409 late reviews).

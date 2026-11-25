@@ -45,7 +45,8 @@ def render_delivery_view(orders_df: pd.DataFrame):
     insight_text = (
         f"💡 <b>Key Insight</b>: On-time fulfillment maintains a <b>4.29 / 5.0 star</b> customer rating. "
         f"Breaching SLA triggers a steep rating collapse in the first week (dropping to <b>3.29 stars for 1–3 days late</b>, "
-        f"and <b>2.10 stars for 4–7 days late</b>) before plateauing near ~1.7 stars for severe delays "
+        f"and <b>2.10 stars for 4–7 days late</b>) before plateauing at <b>1.68 stars for 8–14 days late</b> "
+        f"and <b>1.72 stars for 15+ days late</b> "
         f"({delayed_orders:,} late orders, <b>{breach_rate:.2f}% SLA breach rate</b> across {total_evaluated:,} evaluated orders). "
         f"A linear approximation models ongoing late decay at -0.0160 stars per additional day."
     )

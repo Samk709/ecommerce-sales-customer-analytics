@@ -176,7 +176,7 @@ def render_overview_view(orders_df: pd.DataFrame, items_df: pd.DataFrame, custom
         )
         apply_plotly_theme(fig_trend, "Monthly Delivered Revenue (R$) & Month-over-Month Growth Rate", "Purchase Year-Month", "Revenue (R$)", height=400)
         st.plotly_chart(fig_trend, use_container_width=True, config=PLOTLY_CONFIG)
-        st.caption("Note: Month-over-Month (MoM) growth is suppressed (—) for initial 2016 pilot months with monthly revenue under R$ 10,000 to prevent baseline percentage distortions.")
+        st.caption("Note: Month-over-Month (MoM) growth is calculated only when both the current month and the prior month have delivered revenue of at least R$ 10,000. This suppresses baseline percentage distortions in 2016-09 (no prior month), 2016-10 (prior month R$ 134.97), 2016-12 (current month R$ 10.90), and 2017-01 (prior month R$ 10.90), with valid MoM reporting beginning in 2017-02 (+109.5%).")
 
     with tab_geo:
         merged_cust = deliv_items.merge(orders_df[["order_id", "customer_id"]], on="order_id").merge(
