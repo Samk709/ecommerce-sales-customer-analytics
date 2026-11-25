@@ -1,6 +1,6 @@
 """
 ==============================================================================
-View: Time-Series Seasonality & 30-Day Holt-Winters Sales Forecast
+View: Time-Series Seasonality & 30-Day Holt-Winters Sales Forecast (Optimized)
 ==============================================================================
 Author: Senior Data Analyst & Full-Stack Developer
 Environment: Python 3.10 / 3.11, Streamlit, Plotly
@@ -13,6 +13,7 @@ import plotly.graph_objects as go
 from streamlit_app.components import (
     render_kpi_card,
     render_insight_box,
+    render_section_selector,
     apply_plotly_theme,
     render_download_button,
     PLOTLY_CONFIG,
@@ -33,7 +34,7 @@ def render_forecast_view():
     
     fc_df = load_sales_forecast()
 
-    # Dynamic Key Insight Box generated strictly from underlying data
+    # Dynamic Key Insight Box
     if not fc_df.empty and "future_forecast_brl" in fc_df.columns:
         future_30d = fc_df["future_forecast_brl"].dropna()
         total_30d_proj = future_30d.sum()
@@ -63,13 +64,13 @@ def render_forecast_view():
 
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # 2. Clean Tabs Layout for Laptop-Friendly Presentation
-    tab_chart, tab_table = st.tabs([
+    # 2. Section Selector (Selective execution)
+    active_sec = render_section_selector([
         "📈 30-Day Forward Forecast & Holdout Projection",
         "📋 Daily Forecast & Validation Data Table"
-    ])
+    ], key="forecast_sec")
     
-    with tab_chart:
+    if active_sec == "📈 30-Day Forward Forecast & Holdout Projection":
         if not fc_df.empty:
             fig_fc = go.Figure()
             
@@ -111,7 +112,7 @@ def render_forecast_view():
             apply_plotly_theme(fig_fc, "Daily Delivered Revenue with 30-Day Holt-Winters Projection (R$)", "Order Date", "Daily Revenue (R$)", height=440)
             st.plotly_chart(fig_fc, use_container_width=True, config=PLOTLY_CONFIG)
 
-    with tab_table:
+    elif active_sec == "📋 Daily Forecast & Validation Data Table":
         if not fc_df.empty:
             disp_fc = fc_df.copy().tail(60)
             disp_fc["actual_revenue_brl"] = disp_fc["actual_revenue_brl"].apply(lambda x: f"R$ {x:,.2f}" if pd.notna(x) else "—")

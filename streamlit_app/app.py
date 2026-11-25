@@ -144,7 +144,7 @@ if st.sidebar.button("🔄 Reset All Filters", use_container_width=True):
 st.sidebar.markdown("---")
 st.sidebar.caption("E-Commerce Analytics Platform | Stack: Python, MySQL 8.0, Power BI, Streamlit")
 
-# 5. Apply Filtering Engine
+# 5. Apply Filtering Engine (Zero-Copy Baseline & Cached Multi-Dimensional Slicing)
 is_filtered = not (
     start_date == min_date and
     end_date == max_date and
@@ -153,17 +153,17 @@ is_filtered = not (
     len(selected_rfm) == len(all_rfm)
 )
 
-f_orders, f_items, f_cust, f_prod = filter_dataset(
-    orders_df=orders_df,
-    items_df=items_df,
-    customers_df=customers_df,
-    products_df=products_df,
-    start_date=start_date,
-    end_date=end_date,
-    selected_categories=selected_categories if len(selected_categories) < len(all_categories) else None,
-    selected_states=selected_states if len(selected_states) < len(all_states) else None,
-    selected_rfm=selected_rfm if len(selected_rfm) < len(all_rfm) else None
-)
+if not is_filtered:
+    f_orders, f_items, f_cust, f_prod = orders_df, items_df, customers_df, products_df
+else:
+    from streamlit_app.kpi_metrics import get_cached_filtered_dataset
+    f_orders, f_items, f_cust, f_prod = get_cached_filtered_dataset(
+        start_date=start_date,
+        end_date=end_date,
+        selected_categories=tuple(sorted(selected_categories)) if len(selected_categories) < len(all_categories) else None,
+        selected_states=tuple(sorted(selected_states)) if len(selected_states) < len(all_states) else None,
+        selected_rfm=tuple(sorted(selected_rfm)) if len(selected_rfm) < len(all_rfm) else None
+    )
 
 # 6. Render Executive Top Header
 subtitle_map = {

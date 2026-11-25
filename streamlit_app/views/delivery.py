@@ -1,6 +1,6 @@
 """
 ==============================================================================
-View: Logistics Fulfillment SLA & CSAT Review Score Impact
+View: Logistics Fulfillment SLA & CSAT Review Score Impact (Optimized)
 ==============================================================================
 Author: Senior Data Analyst & Full-Stack Developer
 Environment: Python 3.10 / 3.11, Streamlit, Plotly
@@ -13,6 +13,7 @@ import plotly.graph_objects as go
 from streamlit_app.components import (
     render_kpi_card,
     render_insight_box,
+    render_section_selector,
     apply_plotly_theme,
     render_download_button,
     PLOTLY_CONFIG,
@@ -22,7 +23,11 @@ from streamlit_app.components import (
     COLOR_WARNING,
     COLOR_DANGER
 )
-from streamlit_app.data_loader import load_delivery_csat_summary, load_order_reviews
+from streamlit_app.data_loader import (
+    load_delivery_csat_summary,
+    load_delivery_delay_daily,
+    load_order_reviews
+)
 
 def render_delivery_view(orders_df: pd.DataFrame):
     st.markdown(
@@ -32,7 +37,7 @@ def render_delivery_view(orders_df: pd.DataFrame):
         unsafe_allow_html=True
     )
     
-    deliv_orders = orders_df[orders_df["order_status"] == "delivered"].copy()
+    deliv_orders = orders_df[orders_df["order_status"] == "delivered"]
     evaluated_orders = deliv_orders[deliv_orders["is_delayed"].notna()]
     total_evaluated = len(evaluated_orders)
     delayed_orders = len(evaluated_orders[evaluated_orders["is_delayed"] == 1])
@@ -41,7 +46,7 @@ def render_delivery_view(orders_df: pd.DataFrame):
     breach_rate = (delayed_orders / total_evaluated * 100) if total_evaluated > 0 else 0.0
     avg_lead_time = deliv_orders["delivery_lead_time_days"].mean() if "delivery_lead_time_days" in deliv_orders.columns else 0.0
 
-    # Dynamic Key Insight Box generated strictly from underlying data
+    # Dynamic Key Insight Box
     insight_text = (
         f"💡 <b>Key Insight</b>: On-time fulfillment maintains a <b>4.29 / 5.0 star</b> customer rating. "
         f"Breaching SLA triggers a steep rating collapse in the first week (dropping to <b>3.29 stars for 1–3 days late</b>, "
@@ -67,16 +72,16 @@ def render_delivery_view(orders_df: pd.DataFrame):
 
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # 2. Clean Tabs Layout for Laptop-Friendly Presentation
-    tab_csat, tab_regression, tab_tiers = st.tabs([
+    # 2. Section Selector (Selective execution)
+    active_sec = render_section_selector([
         "⭐ SLA Breach & CSAT Comparison",
         "📉 Late Order Rating Decay (OLS Regression)",
         "📋 Fulfillment Delay Tiers Data Table"
-    ])
+    ], key="delivery_sec")
     
     csat_summary = load_delivery_csat_summary()
 
-    with tab_csat:
+    if active_sec == "⭐ SLA Breach & CSAT Comparison":
         row1_c1, row1_c2 = st.columns([1.0, 1.2])
         with row1_c1:
             binary_data = pd.DataFrame({
@@ -116,19 +121,27 @@ def render_delivery_view(orders_df: pd.DataFrame):
                 apply_plotly_theme(fig_tiers, "Average CSAT Across Fulfillment Delay Tiers", "Delay Tier", "Review Score (1-5)", height=380)
                 st.plotly_chart(fig_tiers, use_container_width=True, config=PLOTLY_CONFIG)
 
-    with tab_regression:
-        reviews_df = load_order_reviews()
-        if not reviews_df.empty and "delivery_delay_days" in deliv_orders.columns:
-            merged_rev = reviews_df.merge(deliv_orders[["order_id", "delivery_delay_days"]], on="order_id")
-            late_rev = merged_rev[merged_rev["delivery_delay_days"] > 0]
-            
-            daily_delay = late_rev.groupby("delivery_delay_days")["review_score"].agg(["mean", "count"]).reset_index()
-            # Filter days <= 60 and hide low-volume outlier days (< 20 orders)
-            daily_delay = daily_delay[(daily_delay["delivery_delay_days"] <= 60) & (daily_delay["count"] >= 20)]
-            
+    elif active_sec == "📉 Late Order Rating Decay (OLS Regression)":
+        is_full_baseline = (len(deliv_orders) == 96478)
+        if is_full_baseline:
+            daily_delay = load_delivery_delay_daily()
+        else:
+            reviews_df = load_order_reviews()
+            if not reviews_df.empty and "delivery_delay_days" in deliv_orders.columns:
+                merged_rev = reviews_df.merge(deliv_orders[["order_id", "delivery_delay_days"]], on="order_id")
+                late_rev = merged_rev[merged_rev["delivery_delay_days"] > 0]
+                daily_delay = late_rev.groupby("delivery_delay_days")["review_score"].agg(["mean", "count"]).reset_index()
+                daily_delay = daily_delay[(daily_delay["delivery_delay_days"] <= 60) & (daily_delay["count"] >= 20)]
+                daily_delay.rename(columns={"mean": "avg_review_score", "count": "review_count"}, inplace=True)
+            else:
+                daily_delay = pd.DataFrame()
+
+        if not daily_delay.empty:
             x_vals = daily_delay["delivery_delay_days"].values
-            y_vals = daily_delay["mean"].values
-            counts = daily_delay["count"].values
+            score_col = "avg_review_score" if "avg_review_score" in daily_delay.columns else "mean"
+            count_col = "review_count" if "review_count" in daily_delay.columns else "count"
+            y_vals = daily_delay[score_col].values
+            counts = daily_delay[count_col].values
             
             slope = -0.0160
             intercept = 2.44
@@ -157,7 +170,7 @@ def render_delivery_view(orders_df: pd.DataFrame):
             st.plotly_chart(fig_ols, use_container_width=True, config=PLOTLY_CONFIG)
             st.caption("Note: Linear OLS trendline (-0.0160 stars/day, intercept 2.44) is a linear approximation over a non-linear decay curve. Customer ratings drop steeply in the first week (4.29 on-time → 3.29 for 1–3 days → 2.10 for 4–7 days) before plateauing near ~1.7 stars. Scatter points hide low-volume outlier days (< 20 reviews).")
 
-    with tab_tiers:
+    elif active_sec == "📋 Fulfillment Delay Tiers Data Table":
         if not csat_summary.empty:
             disp_csat = csat_summary.copy()
             detractor_col = "detractor_pct_1_2" if "detractor_pct_1_2" in disp_csat.columns else "detractor_pct"

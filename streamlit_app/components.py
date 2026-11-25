@@ -352,3 +352,24 @@ def render_download_button(df: pd.DataFrame, filename: str, label: str = "📥 D
         mime="text/csv",
         key=key
     )
+
+def render_section_selector(options: list, default_index: int = 0, key: str = None) -> str:
+    """Renders a modern, performance-optimized segmented control to navigate view sections."""
+    if hasattr(st, "segmented_control"):
+        val = st.segmented_control(
+            "Section",
+            options=options,
+            default=options[default_index] if options else None,
+            key=key,
+            label_visibility="collapsed"
+        )
+        return val if val is not None else options[default_index]
+    else:
+        return st.radio(
+            "Section",
+            options=options,
+            index=default_index,
+            horizontal=True,
+            key=key,
+            label_visibility="collapsed"
+        )
